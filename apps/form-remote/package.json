@@ -1,0 +1,30 @@
+{
+  "name": "form-remote",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --force --host 127.0.0.1 --port 3002",
+    "preview": "vite preview --host 127.0.0.1 --port 3002",
+    "build": "vite build",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "5.2.2",
+    "@module-federation/vite": "1.20.7",
+    "@tramites/form-contracts": "workspace:*",
+    "react": "19.3.0-canary-cbb046ab-20260731",
+    "react-dom": "19.3.0-canary-cbb046ab-20260731",
+    "react-hook-form": "7.85.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "@vitejs/plugin-react": "6.0.5",
+    "typescript": "7.0.2",
+    "vite": "8.2.1",
+    "vitest": "4.0.18"
+  }
+}

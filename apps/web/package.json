@@ -1,0 +1,25 @@
+{
+  "name": "web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1 --port 3000",
+    "build": "next build",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@module-federation/enhanced": "2.8.2",
+    "@tramites/form-contracts": "workspace:*",
+    "next": "16.3.0",
+    "react": "19.3.0-canary-cbb046ab-20260731",
+    "react-dom": "19.3.0-canary-cbb046ab-20260731"
+  },
+  "devDependencies": {
+    "@types/node": "26.2.0",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "typescript": "7.0.2",
+    "vitest": "4.0.18"
+  }
+}

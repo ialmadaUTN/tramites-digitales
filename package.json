@@ -1,0 +1,29 @@
+{
+  "name": "tramites-digitales-local",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=22 <25"
+  },
+  "scripts": {
+    "dev": "concurrently -n web,bff,remote,mock -c blue,green,magenta,yellow \"pnpm --filter web dev\" \"pnpm --filter bff dev\" \"pnpm --filter form-remote dev\" \"pnpm --filter dynamics-mock dev\"",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "test:e2e": "playwright test",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:reset": "supabase db reset",
+    "supabase:link": "supabase link",
+    "supabase:push": "supabase db push",
+    "supabase:push:seed": "supabase db push --include-seed",
+    "supabase:types": "supabase gen types typescript --local > packages/form-contracts/src/database.types.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "concurrently": "9.2.1",
+    "prettier": "3.9.6",
+    "supabase": "2.114.0",
+    "typescript": "7.0.2"
+  }
+}

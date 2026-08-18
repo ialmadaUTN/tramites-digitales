@@ -1,0 +1,10 @@
+{
+  "latestErrorEvent": {
+    "code": "TYPE-001",
+    "message": "Failed to generate type declaration. Execute the below cmd to reproduce and fix the error. #TYPE-001\nargs: {\"cmd\":\"C:\\\\Users\\\\ialma\\\\AppData\\\\Local\\\\fnm_multishells\\\\18832_1786674057773\\\\node.exe C:\\\\Users\\\\ialma\\\\Desktop\\\\Nacho\\\\Programacion\\\\TramitesDigitales\\\\node_modules\\\\.pnpm\\\\typescript@7.0.2\\\\node_modules\\\\typescript\\\\bin\\\\tsc --project C:\\\\Users\\\\ialma\\\\Desktop\\\\Nacho\\\\Programacion\\\\TramitesDigitales\\\\apps\\\\form-remote\\\\node_modules\\\\.federation\\\\tsconfig.8b43030f7a27e63cf52f177369f4cd9f.json\"}\nView the docs to see how to solve: https://module-federation.io/guide/troubleshooting/type#type-001",
+    "args": {
+      "cmd": "C:\\Users\\ialma\\AppData\\Local\\fnm_multishells\\18832_1786674057773\\node.exe C:\\Users\\ialma\\Desktop\\Nacho\\Programacion\\TramitesDigitales\\node_modules\\.pnpm\\typescript@7.0.2\\node_modules\\typescript\\bin\\tsc --project C:\\Users\\ialma\\Desktop\\Nacho\\Programacion\\TramitesDigitales\\apps\\form-remote\\node_modules\\.federation\\tsconfig.8b43030f7a27e63cf52f177369f4cd9f.json"
+    },
+    "timestamp": 1786683652735
+  }
+}
