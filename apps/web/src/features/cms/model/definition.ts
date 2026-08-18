@@ -68,7 +68,27 @@ export function createField(index: number): FormField {
 export function addContainer(definition: FormDefinition): FormDefinition {
   return {
     ...definition,
-    containers: [...definition.containers, { id: createId('container'), title: 'Nuevo contenedor', columns: 1, fields: [] }],
+    containers: [...definition.containers, { id: createId('container'), title: 'Nuevo contenedor', kind: 'section', columns: 1, fields: [] }],
+  };
+}
+
+export function addRepeater(definition: FormDefinition): FormDefinition {
+  return {
+    ...definition,
+    schemaVersion: 2,
+    containers: [
+      ...definition.containers,
+      {
+        id: createId('repeater'),
+        title: 'Nueva grilla',
+        kind: 'repeater',
+        fieldName: `rows${definition.containers.length + 1}`,
+        columns: 1,
+        minRows: 0,
+        maxRows: 10,
+        fields: [],
+      },
+    ],
   };
 }
 
@@ -101,14 +121,17 @@ export function changeFieldType(field: FormField, type: FieldType): FormField {
   return {
     ...field,
     type,
+    allowCustomValue: type === 'combobox' ? false : undefined,
+    defaultValue: type === 'multiselect' ? (Array.isArray(field.defaultValue) ? field.defaultValue : undefined) : field.defaultValue,
     options: hasOptions(type) ? field.options ?? [{ label: 'Opción', value: 'option' }] : field.options,
   };
 }
 
-export function parseDefaultValue(type: FieldType, raw: string): string | number | boolean | undefined {
+export function parseDefaultValue(type: FieldType, raw: string): string | number | boolean | string[] | undefined {
   if (raw === '') return undefined;
   if (type === 'number') return Number(raw);
   if (type === 'checkbox') return raw === 'true';
+  if (type === 'multiselect') return raw.split(',').map((value) => value.trim()).filter(Boolean);
   return raw;
 }
 

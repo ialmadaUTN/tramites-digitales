@@ -1,14 +1,18 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { formDefinitionSchema, FormDefinition, RuntimeFormResponse, validateDefinition } from '@tramites/form-contracts';
+import { flattenFields, formDefinitionSchema, FormDefinition, RuntimeFormResponse, validateDefinition } from '@tramites/form-contracts';
 import { badRequest, conflict, notFound } from './http-error';
 import { SupabaseService } from './supabase.service';
+import { TipificationRegistry } from './tipification.registry';
 
 type FormRow = { id: number; public_id: string; name: string; draft_definition: unknown; published_version_id: number | null; created_at: string; updated_at: string };
 type VersionRow = { id: number; form_id: number; version_number: number; definition: unknown; created_at: string };
 
 @Injectable()
 export class FormsService {
-  constructor(@Inject(SupabaseService) private readonly supabase: SupabaseService) {}
+  constructor(
+    @Inject(SupabaseService) private readonly supabase: SupabaseService,
+    @Inject(TipificationRegistry) private readonly tipifications: TipificationRegistry,
+  ) {}
 
   async list() {
     const { data, error } = await this.supabase.db.from('forms').select('*').order('updated_at', { ascending: false });
@@ -39,6 +43,21 @@ export class FormsService {
   async publish(publicId: string) {
     const form = await this.findForm(publicId);
     const definition = this.parseDefinition(form.draft_definition);
+    if (flattenFields(definition).some((field) => field.type === 'fileUpload') && (
+      process.env.FORM_UPLOADS_ENABLED !== 'true'
+      || process.env.FORM_UPLOADS_AUTHENTICATED !== 'true'
+      || process.env.FORM_UPLOADS_MALWARE_SCANNED !== 'true'
+    )) {
+      badRequest('Los adjuntos requieren carga habilitada, autenticación BFF y análisis antimalware');
+    }
+    if (flattenFields(definition).some((field) => field.type === 'fileUpload') && !this.tipifications.supportsAttachments(definition)) {
+      badRequest('El mapper de tipificación no admite referencias de archivos');
+    }
+    try {
+      this.tipifications.assertAvailable(definition);
+    } catch (error) {
+      badRequest(error instanceof Error ? error.message : 'La tipificación del formulario no está configurada');
+    }
     const { data: last, error: lastError } = await this.supabase.db.from('form_versions').select('version_number').eq('form_id', form.id).order('version_number', { ascending: false }).limit(1).maybeSingle();
     if (lastError) throw new Error(lastError.message);
     const versionNumber = (last?.version_number ?? 0) + 1;

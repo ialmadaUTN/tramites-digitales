@@ -10,9 +10,10 @@ type DynamicFieldProps = Omit<FieldControlProps, 'enabled' | 'options'> & {
   values: FormValues;
   errors: Record<string, { message?: string } | undefined>;
   fieldMap: Map<string, FormField>;
+  uploadFile?: (fieldName: string, file: File) => Promise<import('@tramites/form-contracts').UploadReference>;
 };
 
-export function DynamicField({ field, control, values, errors, fieldMap }: DynamicFieldProps) {
+export function DynamicField({ field, control, values, errors, fieldMap, uploadFile }: DynamicFieldProps) {
   const byId = valuesByFieldId(fieldMap, values);
   if (!isFieldVisible(field, byId)) return null;
   const enabled = isFieldEnabled(field, byId);
@@ -34,7 +35,7 @@ export function DynamicField({ field, control, values, errors, fieldMap }: Dynam
         defaultValue={field.defaultValue}
         render={({ field: controllerField, fieldState }) => (
           <>
-            {renderField({ field, controllerField, enabled, options })}
+            {renderField({ field, controllerField, enabled, options, uploadFile })}
             {(fieldState.error?.message || error) && (
               <span className="field-error">{fieldState.error?.message || error}</span>
             )}

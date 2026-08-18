@@ -12,13 +12,13 @@ export type DefinitionEditorErrors = {
   name?: string;
   title?: string;
   submitLabel?: string;
-  containers: Record<string, { title?: string }>;
+  containers: Record<string, { title?: string; fieldName?: string; rows?: string }>;
   fields: Record<string, FieldEditorErrors>;
   hasErrors: boolean;
 };
 
 export function collectDefinitionEditorErrors(definition: FormDefinition, name?: string): DefinitionEditorErrors {
-  const containers: Record<string, { title?: string }> = {};
+  const containers: Record<string, { title?: string; fieldName?: string; rows?: string }> = {};
   const fields: Record<string, FieldEditorErrors> = {};
   const seenNames = new Map<string, string>();
 
@@ -27,7 +27,18 @@ export function collectDefinitionEditorErrors(definition: FormDefinition, name?:
   const submitLabelError = !definition.submitLabel.trim() ? 'La etiqueta del botón es obligatoria' : undefined;
 
   for (const container of definition.containers) {
+    const containerErrors: { title?: string; fieldName?: string; rows?: string } = {};
+    if (!container.title.trim()) containerErrors.title = 'El tÃ­tulo del contenedor es obligatorio';
+    if (container.kind === 'repeater') {
+      const repeaterFieldNameError = fieldNameError(container.fieldName ?? '');
+      if (repeaterFieldNameError) containerErrors.fieldName = repeaterFieldNameError;
+      if (container.minRows !== undefined && container.maxRows !== undefined && container.minRows > container.maxRows) {
+        containerErrors.rows = 'El mÃ­nimo de filas no puede superar el mÃ¡ximo';
+      }
+    }
     if (!container.title.trim()) containers[container.id] = { title: 'El título del contenedor es obligatorio' };
+
+    if (Object.keys(containerErrors).length > 0) containers[container.id] = { ...containers[container.id], ...containerErrors };
 
     for (const field of container.fields) {
       const fieldErrors: FieldEditorErrors = {};

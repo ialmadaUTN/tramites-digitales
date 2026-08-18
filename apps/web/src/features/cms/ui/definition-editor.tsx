@@ -1,7 +1,7 @@
 'use client';
 
 import type { FormDefinition } from '@tramites/form-contracts';
-import { addContainer, addField, moveContainer, removeContainer, updateContainer } from '../model/definition';
+import { addContainer, addField, addRepeater, moveContainer, removeContainer, updateContainer } from '../model/definition';
 import type { DefinitionEditorErrors } from '../model/editor-validation';
 import { FieldEditor } from './field-editor';
 
@@ -21,6 +21,7 @@ export function DefinitionEditor({ definition, editorErrors, setDefinition }: De
             Organizá tus campos en contenedores y secciones. Cada <code>fieldName</code> se convertirá en una clave del objeto final.
           </span>
         </div>
+        <div className="toolbar-actions">
         <button
           className="button secondary"
           onClick={() => setDefinition(addContainer(definition))}
@@ -31,6 +32,10 @@ export function DefinitionEditor({ definition, editorErrors, setDefinition }: De
           </svg>
           Nuevo Contenedor
         </button>
+        <button className="button secondary" onClick={() => setDefinition(addRepeater(definition))}>
+          + Nueva Grilla Repetible
+        </button>
+        </div>
       </div>
 
       {definition.containers.map((container, containerIndex) => (
@@ -85,6 +90,41 @@ export function DefinitionEditor({ definition, editorErrors, setDefinition }: De
                 <span className="field-error">{editorErrors.containers[container.id]?.title}</span>
               )}
             </div>
+            {container.kind === 'repeater' && (
+              <>
+                <div className="form-group">
+                  <label>Clave de payload de la grilla</label>
+                  <input
+                    value={container.fieldName ?? ''}
+                    className={editorErrors.containers[container.id]?.fieldName ? 'invalid' : undefined}
+                    aria-invalid={Boolean(editorErrors.containers[container.id]?.fieldName)}
+                    onChange={(event) => setDefinition(updateContainer(definition, container.id, (current) => ({ ...current, fieldName: event.target.value })))}
+                    placeholder="Ej. previousClaims"
+                  />
+                  {editorErrors.containers[container.id]?.fieldName && <span className="field-error">{editorErrors.containers[container.id]?.fieldName}</span>}
+                </div>
+                <div className="form-group">
+                  <label>Mínimo de filas</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={container.minRows ?? 0}
+                    onChange={(event) => setDefinition(updateContainer(definition, container.id, (current) => ({ ...current, minRows: Number(event.target.value) })))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Máximo de filas</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={container.maxRows ?? 10}
+                    onChange={(event) => setDefinition(updateContainer(definition, container.id, (current) => ({ ...current, maxRows: Number(event.target.value) })))}
+                  />
+                  {editorErrors.containers[container.id]?.rows && <span className="field-error">{editorErrors.containers[container.id]?.rows}</span>}
+                </div>
+              </>
+            )}
             <div className="form-group">
               <label>Distribución en columnas</label>
               <select
@@ -106,6 +146,7 @@ export function DefinitionEditor({ definition, editorErrors, setDefinition }: De
                 field={field}
                 index={fieldIndex}
                 definition={definition}
+                repeater={container.kind === 'repeater'}
                 fieldErrors={editorErrors.fields[field.id]}
                 setDefinition={setDefinition}
               />

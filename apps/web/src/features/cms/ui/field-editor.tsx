@@ -14,7 +14,7 @@ import {
   updateField,
   type ConditionKey,
 } from '../model/definition';
-import { FIELD_TYPES, OPTION_FIELD_TYPES } from '../model/constants';
+import { FIELD_TYPES, OPTION_FIELD_TYPES, REPEATER_FIELD_TYPES } from '../model/constants';
 import type { FieldEditorErrors } from '../model/editor-validation';
 import { ConditionEditor } from './condition-editor';
 import { OptionsEditor } from './options-editor';
@@ -24,22 +24,29 @@ type FieldEditorProps = {
   index: number;
   definition: FormDefinition;
   fieldErrors?: FieldEditorErrors;
+  repeater?: boolean;
   setDefinition: (definition: FormDefinition) => void;
 };
 
 const TYPE_LABELS: Record<string, string> = {
   text: 'Texto simple',
+  email: 'Email',
+  phone: 'Teléfono',
+  alphabetic: 'Solo letras',
+  alphanumeric: 'Alfanumérico',
   number: 'Número',
   select: 'Desplegable (Select)',
   checkbox: 'Casilla (Checkbox)',
   textarea: 'Texto largo (Textarea)',
   date: 'Fecha',
   time: 'Hora',
+  multiselect: 'Selección múltiple',
+  fileUpload: 'Archivos (PDF / imagen)',
   radio: 'Botones Opción (Radio)',
   combobox: 'Búsqueda (Combobox)',
 };
 
-export function FieldEditor({ field, index, definition, fieldErrors, setDefinition }: FieldEditorProps) {
+export function FieldEditor({ field, index, definition, fieldErrors, repeater = false, setDefinition }: FieldEditorProps) {
   const change = (update: (current: FormField) => FormField) => setDefinition(updateField(definition, field.id, update));
   const candidates = otherFields(definition, field.id);
   const toggleCondition = (key: ConditionKey, enabled: boolean) =>
@@ -125,7 +132,7 @@ export function FieldEditor({ field, index, definition, fieldErrors, setDefiniti
             value={field.type}
             onChange={(event) => change((current) => changeFieldType(current, event.target.value as FieldType))}
           >
-            {FIELD_TYPES.map((type) => (
+            {(repeater ? REPEATER_FIELD_TYPES : FIELD_TYPES).map((type) => (
               <option key={type} value={type}>
                 {TYPE_LABELS[type] || type}
               </option>
@@ -179,6 +186,46 @@ export function FieldEditor({ field, index, definition, fieldErrors, setDefiniti
             />
             {fieldErrors?.options && <span className="field-error">{fieldErrors.options}</span>}
           </div>
+        )}
+        {['text', 'phone', 'alphabetic', 'alphanumeric'].includes(field.type) && (
+          <div className="form-group">
+            <label>Máscara</label>
+            <select
+              value={field.maskKind ?? ''}
+              onChange={(event) => change((current) => ({ ...current, maskKind: event.target.value ? event.target.value as FormField['maskKind'] : undefined }))}
+            >
+              <option value="">Sin máscara</option>
+              <option value="phone_ar">Teléfono argentino</option>
+              <option value="dni_ar">DNI</option>
+              <option value="cuit_ar">CUIT</option>
+              <option value="cbu">CBU</option>
+            </select>
+          </div>
+        )}
+        {field.type === 'combobox' && (
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={field.allowCustomValue !== false}
+              onChange={(event) => change((current) => ({ ...current, allowCustomValue: event.target.checked }))}
+            />
+            Permitir valores fuera del listado
+          </label>
+        )}
+        {field.type === 'fileUpload' && (
+          <>
+            <div className="form-group">
+              <label>Mínimo de archivos</label>
+              <input type="number" min={0} max={5} value={field.minFiles ?? 0} onChange={(event) => change((current) => ({ ...current, minFiles: Number(event.target.value) }))} />
+            </div>
+            <div className="form-group">
+              <label>Máximo de archivos</label>
+              <input type="number" min={1} max={5} value={field.maxFiles ?? 5} onChange={(event) => change((current) => ({ ...current, maxFiles: Number(event.target.value) }))} />
+            </div>
+            <div className="form-group full">
+              <span className="hint">Solo se admiten PDF, JPG y PNG de hasta 10 MB por archivo.</span>
+            </div>
+          </>
         )}
       </div>
 
@@ -296,7 +343,7 @@ export function FieldEditor({ field, index, definition, fieldErrors, setDefiniti
       </div>
 
       {/* Switches & Condicionales */}
-      <div className="checkbox-row">
+      {!repeater && <div className="checkbox-row">
         <label>
           <input
             type="checkbox"
@@ -329,9 +376,9 @@ export function FieldEditor({ field, index, definition, fieldErrors, setDefiniti
           />
           Obligatoriedad condicional
         </label>
-      </div>
+      </div>}
 
-      {candidates.length > 0 && (
+      {!repeater && candidates.length > 0 && (
         <>
           <ConditionEditor
             label="Visibilidad"

@@ -23,4 +23,9 @@ export class SupabaseService implements OnModuleInit {
     if (!this.client) throw new Error('Supabase todavía no fue inicializado');
     return this.client;
   }
+
+  get storage(): SupabaseClient<Database>['storage'] {
+    if (!this.client) throw new Error('Supabase no fue inicializado');
+    return this.client.storage;
+  }
 }
