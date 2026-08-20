@@ -168,6 +168,21 @@ export function WorkspaceHeader({
           />
           {editorErrors.submitLabel && <span className="field-error">{editorErrors.submitLabel}</span>}
         </div>
+        <div className="form-group">
+          <label>Clave de tipificación</label>
+          <input
+            value={definition.tipificationKey ?? ''}
+            className={editorErrors.tipificationKey ? 'invalid' : undefined}
+            aria-invalid={Boolean(editorErrors.tipificationKey)}
+            onChange={(event) => onDefinitionChange({ ...definition, schemaVersion: 2, tipificationKey: event.target.value })}
+            placeholder="Ej. generic"
+          />
+          {editorErrors.tipificationKey ? (
+            <span className="field-error">{editorErrors.tipificationKey}</span>
+          ) : (
+            <span className="hint">Debe coincidir con un mapper registrado en el BFF.</span>
+          )}
+        </div>
       </div>
     </div>
   );

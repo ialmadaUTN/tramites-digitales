@@ -10,9 +10,14 @@ export class SubmissionsController {
 
   @Post('runtime/forms/:formId/submissions')
   @HttpCode(HttpStatus.CREATED)
-  submit(@Param('formId') formId: string, @Headers('idempotency-key') idempotencyKey: string | undefined, @Body() body: unknown) {
+  submit(
+    @Param('formId') formId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Headers('x-upload-session') uploadSession: string | undefined,
+    @Body() body: unknown,
+  ) {
     const input = submitSchema.parse(body);
-    return this.submissions.submit(formId, input.version, input.payload, idempotencyKey ?? '');
+    return this.submissions.submit(formId, input.version, input.payload, idempotencyKey ?? '', uploadSession ?? '');
   }
 
   @Post('submissions/:submissionId/delivery/retry')

@@ -2,6 +2,7 @@ import type { DynamicFormProps } from '@tramites/form-contracts';
 import { useRuntimeForm } from '../hooks/use-runtime-form';
 import { DynamicField } from './fields/dynamic-field';
 import { FormState } from './form-state';
+import { DynamicRepeater } from './repeater/dynamic-repeater';
 import '../../../styles.css';
 
 export function DynamicForm(props: DynamicFormProps) {
@@ -34,18 +35,23 @@ export function DynamicForm(props: DynamicFormProps) {
       {runtime.definition.containers.map((container) => (
         <section className="form-container" key={container.id}>
           <h2>{container.title}</h2>
-          <div className={container.columns === 2 ? 'field-grid two-columns' : 'field-grid'}>
-            {container.fields.map((field) => (
-              <DynamicField
-                key={field.id}
-                field={field}
-                control={runtime.control}
-                values={runtime.values}
-                errors={runtime.errors}
-                fieldMap={runtime.fieldMap}
-              />
-            ))}
-          </div>
+          {container.kind === 'repeater' ? (
+            <DynamicRepeater container={container} control={runtime.control} />
+          ) : (
+            <div className={container.columns === 2 ? 'field-grid two-columns' : 'field-grid'}>
+              {container.fields.map((field) => (
+                <DynamicField
+                  key={field.id}
+                  field={field}
+                  control={runtime.control}
+                  values={runtime.values}
+                  errors={runtime.errors}
+                  fieldMap={runtime.fieldMap}
+                  uploadFile={runtime.uploadFile}
+                />
+              ))}
+            </div>
+          )}
         </section>
       ))}
       {runtime.remoteError && <div className="inline-error">{runtime.remoteError.message}</div>}

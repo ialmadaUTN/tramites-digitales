@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useForm, type Resolver } from 'react-hook-form';
-import type { DynamicFormProps, FormDefinition, FormRuntimeError, RuntimeFormResponse, SubmissionReceipt } from '@tramites/form-contracts';
+import { useForm, type FieldErrors, type Resolver } from 'react-hook-form';
+import type { DynamicFormProps, FormDefinition, FormRuntimeError, RuntimeFormResponse, SubmissionReceipt, UploadReference } from '@tramites/form-contracts';
 import { flattenFields } from '@tramites/form-contracts';
 import { validateSubmission } from '@tramites/form-contracts/validation';
 import { toErrorMessage } from '../../../shared/lib/http';
 import type { FormValues } from '../../../shared/types/form-values';
 import { createRuntimeApi, type RuntimeApi } from '../api/runtime-api';
+import { getStorageClient } from '../api/storage-client';
 
 function applyFieldErrors(
   setError: (name: string, error: { type: string; message: string }) => void,
@@ -16,6 +17,23 @@ function applyFieldErrors(
   }
 }
 
+function nestFieldErrors(errors: Record<string, string>): FieldErrors<FormValues> {
+  const nested: Record<string, any> = {};
+  for (const [path, message] of Object.entries(errors)) {
+    const parts = path.split('.');
+    let current = nested;
+    parts.forEach((part, index) => {
+      if (index === parts.length - 1) {
+        current[part] = { type: 'validate', message };
+        return;
+      }
+      current[part] ??= {};
+      current = current[part] as Record<string, any>;
+    });
+  }
+  return nested as FieldErrors<FormValues>;
+}
+
 const createResolver = (getDefinition: () => FormDefinition | undefined): Resolver<FormValues> =>
   async (values) => {
     const definition = getDefinition();
@@ -24,9 +42,7 @@ const createResolver = (getDefinition: () => FormDefinition | undefined): Resolv
     if (result.success) return { values, errors: {} };
     return {
       values: {},
-      errors: Object.fromEntries(
-        Object.entries(result.errors).map(([fieldName, message]) => [fieldName, { type: 'validate', message }]),
-      ),
+      errors: nestFieldErrors(result.errors),
     };
   };
 
@@ -40,6 +56,7 @@ export function useRuntimeForm(
   const [receipt, setReceipt] = useState<SubmissionReceipt | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [remoteError, setRemoteError] = useState<FormRuntimeError | null>(null);
+  const uploadSession = useRef(crypto.randomUUID());
   const definitionRef = useRef<FormDefinition | undefined>(undefined);
   const form = useForm<FormValues>({
     mode: 'onTouched',
@@ -85,7 +102,7 @@ export function useRuntimeForm(
       return;
     }
     try {
-      const nextReceipt = await api.submit(formId, { version: runtime.version, payload: validation.data });
+      const nextReceipt = await api.submit(formId, { version: runtime.version, payload: validation.data }, uploadSession.current);
       setReceipt(nextReceipt);
       onSubmitted?.(nextReceipt);
     } catch (error) {
@@ -100,6 +117,17 @@ export function useRuntimeForm(
     }
   }
 
+  async function uploadFile(fieldName: string, file: File): Promise<UploadReference> {
+    const storage = getStorageClient();
+    if (!storage) throw new Error('La carga de archivos no está configurada en este ambiente');
+    const ticket = await api.createUpload(formId, { fieldName, name: file.name, contentType: file.type, size: file.size }, uploadSession.current);
+    const { error } = await storage.storage.from(ticket.bucket).uploadToSignedUrl(ticket.path, ticket.token, file, { contentType: file.type, cacheControl: '3600' });
+    if (error) throw new Error(error.message);
+    return api.completeUpload(formId, ticket.uploadId, uploadSession.current);
+  }
+
+  const uploadCapability = getStorageClient() ? uploadFile : undefined;
+
   return {
     control: form.control,
     handleSubmit: form.handleSubmit,
@@ -113,5 +141,6 @@ export function useRuntimeForm(
     submitting,
     remoteError,
     submit,
+    uploadFile: uploadCapability,
   };
 }

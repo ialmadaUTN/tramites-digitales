@@ -7,6 +7,24 @@ import { formsApi, type FormsApi, type FormSummary } from '../api/forms-api';
 import { INITIAL_DEFINITION } from '../model/constants';
 import { collectDefinitionEditorErrors } from '../model/editor-validation';
 
+function upgradeDefinitionToV2(definition: FormDefinition): FormDefinition {
+  if (definition.schemaVersion === 2) return definition;
+  return {
+    ...definition,
+    schemaVersion: 2,
+    tipificationKey: definition.tipificationKey ?? 'generic@v1',
+    containers: definition.containers.map((container) => ({
+      ...container,
+      kind: container.kind ?? 'section',
+      fields: container.fields.map((field) => (
+        field.type === 'combobox' && field.allowCustomValue === undefined
+          ? { ...field, allowCustomValue: true }
+          : field
+      )),
+    })),
+  };
+}
+
 export type WorkspaceStatus = { text: string; error?: boolean };
 
 export function useCmsWorkspace(api: FormsApi = formsApi) {
@@ -36,7 +54,7 @@ export function useCmsWorkspace(api: FormsApi = formsApi) {
     setStatus(null);
     const draft = await api.getDraft(formId);
     setName(draft.name);
-    setDefinition(draft.definition);
+    setDefinition(upgradeDefinitionToV2(draft.definition));
   }
 
   async function createForm() {

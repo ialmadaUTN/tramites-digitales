@@ -1,10 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { cleanSubmissionPayload, FormDefinition, Json, SubmissionReceipt } from '@tramites/form-contracts';
+import { cleanSubmissionPayload, FormDefinition, FormValue, Json, SubmissionReceipt } from '@tramites/form-contracts';
 import { validateSubmission } from '@tramites/form-contracts/validation';
 import { badRequest, conflict, notFound } from './http-error';
 import { FormsService } from './forms.service';
 import { SupabaseService } from './supabase.service';
 import { DeliveryResult, DynamicsClient } from './dynamics.client';
+import { TipificationRegistry } from './tipification.registry';
+import { UploadsService } from './uploads.service';
 
 type SubmissionRow = {
   id: number;
@@ -28,9 +30,11 @@ export class SubmissionsService {
     @Inject(SupabaseService) private readonly supabase: SupabaseService,
     @Inject(FormsService) private readonly forms: FormsService,
     @Inject(DynamicsClient) private readonly dynamics: DynamicsClient,
+    @Inject(TipificationRegistry) private readonly tipifications: TipificationRegistry,
+    @Inject(UploadsService) private readonly uploads: UploadsService,
   ) {}
 
-  async submit(publicId: string, version: number, payload: Record<string, unknown>, idempotencyKey: string): Promise<SubmissionReceipt> {
+  async submit(publicId: string, version: number, payload: Record<string, unknown>, idempotencyKey: string, uploadSession: string): Promise<SubmissionReceipt> {
     if (!idempotencyKey.trim()) badRequest('Idempotency-Key es obligatorio');
     const form = await this.forms.findForm(publicId);
     const runtime = await this.forms.runtime(publicId, 'published');
@@ -39,10 +43,13 @@ export class SubmissionsService {
     const result = validateSubmission(definition, payload);
     if (!result.success) badRequest('El payload no cumple la definición publicada', result.errors);
     const cleanPayload = cleanSubmissionPayload(definition, result.data);
+    const formVersionId = runtime.version ? await this.versionId(form.id, runtime.version) : null;
+    if (!formVersionId) badRequest('La versión publicada no está disponible');
+    await this.uploads.assertSubmissionUploads(publicId, definition, cleanPayload, uploadSession, formVersionId);
 
     const { data: inserted, error } = await this.supabase.db.from('submissions').insert({
       form_id: form.id,
-      form_version_id: runtime.version ? await this.versionId(form.id, runtime.version) : null,
+      form_version_id: formVersionId,
       idempotency_key: idempotencyKey,
       payload: cleanPayload,
     }).select('*').single();
@@ -55,7 +62,8 @@ export class SubmissionsService {
       throw new Error(error?.message ?? 'No se pudo guardar la submission');
     }
 
-    const delivery = await this.deliver(inserted, publicId, runtime.version ?? 1);
+    await this.uploads.attachToSubmission(inserted.id, cleanPayload);
+    const delivery = await this.deliver(inserted, publicId, runtime.version ?? 1, definition);
     const updated = await this.updateDelivery(inserted.public_id, delivery);
     return this.toReceipt(updated, publicId, runtime.version ?? 1);
   }
@@ -68,19 +76,21 @@ export class SubmissionsService {
     const { data: version, error: versionError } = await this.supabase.db.from('form_versions').select('version_number, definition').eq('id', submission.form_version_id).single();
     if (versionError || !version) notFound('No se encontró la versión de la submission');
     const definition = version.definition as FormDefinition;
-    const delivery = await this.deliver(submission, form.public_id, version.version_number);
+    const delivery = await this.deliver(submission, form.public_id, version.version_number, definition);
     const updated = await this.updateDelivery(submission.public_id, delivery);
     return this.toReceipt(updated, form.public_id, version.version_number);
   }
 
-  private async deliver(submission: SubmissionRow, formId: string, version: number): Promise<DeliveryResult> {
-    const payload = submission.payload as Record<string, string | number | boolean>;
+  private async deliver(submission: SubmissionRow, formId: string, version: number, definition: FormDefinition): Promise<DeliveryResult> {
+    const payload = submission.payload as Record<string, FormValue>;
+    const key = definition.tipificationKey ?? 'generic';
+    const mapped = this.tipifications.map(key, { formId, definition, data: payload });
     return this.dynamics.deliver({
       submissionId: submission.public_id,
       formId,
       formVersion: version,
       submittedAt: new Date(submission.submitted_at).toISOString(),
-      data: payload,
+      data: mapped,
     });
   }
 

@@ -21,6 +21,7 @@ export function DefinitionEditor({ definition, editorErrors, setDefinition }: De
             Organizá tus campos en contenedores y secciones. Cada <code>fieldName</code> se convertirá en una clave del objeto final.
           </span>
         </div>
+        <div className="toolbar-actions">
         <button
           className="button secondary"
           onClick={() => setDefinition(addContainer(definition))}
@@ -31,6 +32,7 @@ export function DefinitionEditor({ definition, editorErrors, setDefinition }: De
           </svg>
           Nuevo Contenedor
         </button>
+        </div>
       </div>
 
       {definition.containers.map((container, containerIndex) => (
@@ -85,6 +87,45 @@ export function DefinitionEditor({ definition, editorErrors, setDefinition }: De
                 <span className="field-error">{editorErrors.containers[container.id]?.title}</span>
               )}
             </div>
+            {container.kind === 'repeater' && (
+              <>
+                <div className="form-group">
+                  <label>Clave de payload de la grilla</label>
+                  <input
+                    value={container.fieldName ?? ''}
+                    className={editorErrors.containers[container.id]?.fieldName ? 'invalid' : undefined}
+                    aria-invalid={Boolean(editorErrors.containers[container.id]?.fieldName)}
+                    onChange={(event) => setDefinition(updateContainer(definition, container.id, (current) => ({ ...current, fieldName: event.target.value })))}
+                    placeholder="Ej. previousClaims"
+                  />
+                  {editorErrors.containers[container.id]?.fieldName && <span className="field-error">{editorErrors.containers[container.id]?.fieldName}</span>}
+                </div>
+                <div className="form-group">
+                  <label>Mínimo de filas</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={container.minRows ?? 0}
+                    className={editorErrors.containers[container.id]?.rows ? 'invalid' : undefined}
+                    onChange={(event) => setDefinition(updateContainer(definition, container.id, (current) => ({ ...current, minRows: Number(event.target.value) })))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Máximo de filas</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={50}
+                    step={1}
+                    value={container.maxRows ?? 10}
+                    className={editorErrors.containers[container.id]?.rows ? 'invalid' : undefined}
+                    onChange={(event) => setDefinition(updateContainer(definition, container.id, (current) => ({ ...current, maxRows: Number(event.target.value) })))}
+                  />
+                  {editorErrors.containers[container.id]?.rows && <span className="field-error">{editorErrors.containers[container.id]?.rows}</span>}
+                </div>
+              </>
+            )}
             <div className="form-group">
               <label>Distribución en columnas</label>
               <select
@@ -99,6 +140,10 @@ export function DefinitionEditor({ definition, editorErrors, setDefinition }: De
             </div>
           </div>
 
+          {editorErrors.containers[container.id]?.fields && (
+            <span className="field-error">{editorErrors.containers[container.id]?.fields}</span>
+          )}
+
           <div style={{ marginTop: 14 }}>
             {container.fields.map((field, fieldIndex) => (
               <FieldEditor
@@ -106,6 +151,7 @@ export function DefinitionEditor({ definition, editorErrors, setDefinition }: De
                 field={field}
                 index={fieldIndex}
                 definition={definition}
+                repeater={container.kind === 'repeater'}
                 fieldErrors={editorErrors.fields[field.id]}
                 setDefinition={setDefinition}
               />

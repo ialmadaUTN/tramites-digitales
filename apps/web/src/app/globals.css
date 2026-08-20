@@ -1223,3 +1223,95 @@ button, input, textarea, select {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* Condition editor */
+.condition-editor {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--soft);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.condition-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.condition-editor-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.condition-logic {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.condition-logic select {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  background: white;
+  color: var(--ink);
+  font-size: 12.5px;
+}
+
+.condition-rule {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: white;
+}
+
+.condition-rule .button {
+  align-self: flex-end;
+}
+
+.condition-value-list,
+.default-value-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 4px 0;
+}
+
+.condition-value-option,
+.default-value-option {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.condition-value-option input[type="checkbox"],
+.default-value-option input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.option-field-wrap .field-error {
+  display: block;
+  margin-top: 4px;
+}

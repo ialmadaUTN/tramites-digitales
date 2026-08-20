@@ -1,5 +1,10 @@
-import type { ConditionGroup, FieldType, FormContainer, FormDefinition, FormField, FormOption } from '@tramites/form-contracts';
-import { OPTION_FIELD_TYPES } from './constants';
+import type { ConditionGroup, ConditionRule, FieldType, FormContainer, FormDefinition, FormField, FormOption } from '@tramites/form-contracts';
+import { defaultValuesOutsideCatalog, isMaskCompatible } from '@tramites/form-contracts/field-rules';
+import {
+  LENGTH_RULE_FIELD_TYPES,
+  OPTION_FIELD_TYPES,
+  READ_ONLY_BLOCKED_FIELD_TYPES,
+} from './constants';
 import { createId } from './ids';
 
 export type ConditionKey = 'visible' | 'enabled' | 'required';
@@ -68,7 +73,7 @@ export function createField(index: number): FormField {
 export function addContainer(definition: FormDefinition): FormDefinition {
   return {
     ...definition,
-    containers: [...definition.containers, { id: createId('container'), title: 'Nuevo contenedor', columns: 1, fields: [] }],
+    containers: [...definition.containers, { id: createId('container'), title: 'Nuevo contenedor', kind: 'section', columns: 1, fields: [] }],
   };
 }
 
@@ -97,19 +102,90 @@ export function hasOptions(type: FieldType): boolean {
   return OPTION_FIELD_TYPES.includes(type);
 }
 
-export function changeFieldType(field: FormField, type: FieldType): FormField {
-  return {
-    ...field,
-    type,
-    options: hasOptions(type) ? field.options ?? [{ label: 'Opción', value: 'option' }] : field.options,
-  };
+function dropErrorMessages(rules: FormField['rules'], keys: (keyof NonNullable<FormField['rules']['errorMessages']>)[]) {
+  if (!rules.errorMessages) return;
+  const messages = { ...rules.errorMessages };
+  for (const key of keys) delete messages[key];
+  if (Object.keys(messages).length) rules.errorMessages = messages;
+  else delete rules.errorMessages;
 }
 
-export function parseDefaultValue(type: FieldType, raw: string): string | number | boolean | undefined {
+/** Conserva el valor por defecto solo cuando sigue siendo representable en el nuevo tipo. */
+function defaultValueForType(current: FormField['defaultValue'], type: FieldType): FormField['defaultValue'] {
+  if (current === undefined) return undefined;
+  if (type === 'multiselect') return Array.isArray(current) ? current : undefined;
+  if (Array.isArray(current) || type === 'fileUpload') return undefined;
+  if (type === 'number') return typeof current === 'number' && Number.isFinite(current) ? current : undefined;
+  if (type === 'checkbox') return typeof current === 'boolean' ? current : undefined;
+  return typeof current === 'boolean' ? undefined : current;
+}
+
+/**
+ * Descarta la configuración que el nuevo tipo no admite, para que el editor no
+ * arrastre reglas incompatibles que el contrato rechaza al guardar.
+ */
+export function changeFieldType(field: FormField, type: FieldType): FormField {
+  const rules: FormField['rules'] = { ...field.rules };
+  if (!LENGTH_RULE_FIELD_TYPES.includes(type)) {
+    delete rules.minLength;
+    delete rules.maxLength;
+    dropErrorMessages(rules, ['minLength', 'maxLength']);
+  }
+  if (type !== 'number') {
+    delete rules.min;
+    delete rules.max;
+    dropErrorMessages(rules, ['min', 'max']);
+  }
+
+  const next: FormField = {
+    ...field,
+    type,
+    rules,
+    defaultValue: defaultValueForType(field.defaultValue, type),
+    options: hasOptions(type) ? field.options ?? [{ label: 'Opción', value: 'option' }] : undefined,
+  };
+  if (type === 'combobox') next.allowCustomValue = field.allowCustomValue ?? false;
+  else delete next.allowCustomValue;
+  if (!next.maskKind || !isMaskCompatible(type, next.maskKind)) delete next.maskKind;
+  if (READ_ONLY_BLOCKED_FIELD_TYPES.includes(type)) delete next.readOnly;
+  if (type !== 'fileUpload') {
+    delete next.minFiles;
+    delete next.maxFiles;
+    delete next.allowedMimeTypes;
+  }
+  // Un valor por defecto heredado de otro tipo no pertenece al catálogo nuevo:
+  // dejarlo produciría un campo que el contrato rechaza al guardar.
+  if (defaultValuesOutsideCatalog(next).length > 0) delete next.defaultValue;
+  if (next.defaultValue === undefined) delete next.defaultValue;
+  if (next.options === undefined) delete next.options;
+  return next;
+}
+
+export function parseDefaultValue(type: FieldType, raw: string): string | number | boolean | string[] | undefined {
   if (raw === '') return undefined;
   if (type === 'number') return Number(raw);
   if (type === 'checkbox') return raw === 'true';
+  if (type === 'multiselect') return raw.split(',').map((value) => value.trim()).filter(Boolean);
   return raw;
+}
+
+/** Alterna un valor del catálogo dentro del `defaultValue` de un multiselect. */
+export function toggleDefaultOption(
+  current: FormField['defaultValue'],
+  value: string | number,
+  checked: boolean,
+): FormField['defaultValue'] {
+  const list = Array.isArray(current) ? current : [];
+  const without = list.filter((item) => String(item) !== String(value));
+  const next = checked ? [...without, value] : without;
+  return next.length ? next : undefined;
+}
+
+export function setFieldDefaultValue(field: FormField, value: FormField['defaultValue']): FormField {
+  const next = { ...field };
+  if (value === undefined) delete next.defaultValue;
+  else next.defaultValue = value;
+  return next;
 }
 
 export function slugifyOptionValue(label: string): string {
@@ -158,8 +234,15 @@ export function parseOptions(text: string): FormOption[] {
   });
 }
 
+/**
+ * Candidatos válidos para una condición. Las celdas de grilla quedan fuera:
+ * el contrato no permite referenciarlas y guardarlas haría fallar el BFF.
+ */
 export function otherFields(definition: FormDefinition, fieldId: string): FormField[] {
-  return definition.containers.flatMap((container) => container.fields).filter((field) => field.id !== fieldId);
+  return definition.containers
+    .filter((container) => container.kind !== 'repeater')
+    .flatMap((container) => container.fields)
+    .filter((field) => field.id !== fieldId);
 }
 
 export function toggleFieldCondition(field: FormField, key: ConditionKey, enabled: boolean, fallbackFieldId: string): FormField {
@@ -176,8 +259,41 @@ export function setFieldCondition(field: FormField, key: ConditionKey, value: Co
   return { ...field, conditions: { ...(field.conditions ?? {}), [key]: value } };
 }
 
+export function setConditionLogic(condition: ConditionGroup, logic: ConditionGroup['logic']): ConditionGroup {
+  return { ...condition, logic };
+}
+
+export function addConditionRule(condition: ConditionGroup, fallbackFieldId: string): ConditionGroup {
+  return { ...condition, rules: [...condition.rules, { fieldId: fallbackFieldId, operator: 'equals', value: '' }] };
+}
+
+export function updateConditionRule(
+  condition: ConditionGroup,
+  index: number,
+  patch: Partial<ConditionRule>,
+): ConditionGroup {
+  return { ...condition, rules: condition.rules.map((rule, i) => (i === index ? { ...rule, ...patch } : rule)) };
+}
+
+/** El contrato exige al menos una regla, así que la última no se puede quitar. */
+export function removeConditionRule(condition: ConditionGroup, index: number): ConditionGroup {
+  if (condition.rules.length <= 1) return condition;
+  return { ...condition, rules: condition.rules.filter((_, i) => i !== index) };
+}
+
+export function setFieldReadOnly(field: FormField, readOnly: boolean): FormField {
+  const next = { ...field };
+  if (readOnly) next.readOnly = true;
+  else delete next.readOnly;
+  return next;
+}
+
+/** `undefined` borra la regla en vez de dejar la clave presente sin valor. */
 export function setFieldRule(field: FormField, key: keyof FormField['rules'], value: unknown): FormField {
-  return { ...field, rules: { ...field.rules, [key]: value } };
+  const rules = { ...field.rules };
+  if (value === undefined || value === false || value === '') delete rules[key];
+  else Object.assign(rules, { [key]: value });
+  return { ...field, rules };
 }
 
 export function setFieldErrorMessage(
@@ -185,8 +301,11 @@ export function setFieldErrorMessage(
   key: keyof NonNullable<FormField['rules']['errorMessages']>,
   value: string,
 ): FormField {
-  return {
-    ...field,
-    rules: { ...field.rules, errorMessages: { ...field.rules.errorMessages, [key]: value } },
-  };
+  const messages = { ...field.rules.errorMessages };
+  if (value.trim()) messages[key] = value;
+  else delete messages[key];
+  const rules = { ...field.rules };
+  if (Object.keys(messages).length) rules.errorMessages = messages;
+  else delete rules.errorMessages;
+  return { ...field, rules };
 }

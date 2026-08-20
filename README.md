@@ -60,4 +60,8 @@ $env:E2E_MANAGED_SERVERS = 'true'
 pnpm test:e2e
 ```
 
-El browser nunca habla con Supabase. Todas las lecturas y escrituras pasan por el BFF.
+El browser no accede a las tablas de Supabase ni conoce la clave secreta. Para adjuntos, cuando las tres flags de seguridad están activas, el BFF emite una URL firmada y el browser sube directamente el binario al bucket privado; la confirmación, validación de metadata y asociación a la submission siguen pasando por el BFF.
+
+Los adjuntos permanecen deshabilitados por defecto (`FORM_UPLOADS_ENABLED=false`, `FORM_UPLOADS_AUTHENTICATED=false`, `FORM_UPLOADS_MALWARE_SCANNED=false`). Antes de activarlos en un ambiente real hay que conectar la autenticación del template corporativo y el análisis antimalware; el `X-Upload-Session` del prototipo local no reemplaza esa autenticación.
+
+Las definiciones v2 usan `tipificationKey` y el BFF resuelve mappers registrados y versionados con la convención `clave@version` (por ejemplo, `claims@v2`).

@@ -17,7 +17,8 @@
     "supabase:link": "supabase link",
     "supabase:push": "supabase db push",
     "supabase:push:seed": "supabase db push --include-seed",
-    "supabase:types": "supabase gen types typescript --local > packages/form-contracts/src/database.types.ts"
+    "supabase:types": "supabase gen types typescript --local > packages/form-contracts/src/database.types.ts",
+    "test:coverage": "pnpm -r --no-bail run test:coverage"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",

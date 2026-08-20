@@ -3,11 +3,12 @@ import { commonInputProps } from './common-props';
 import type { FieldRenderer } from './types';
 
 export const renderSelectField: FieldRenderer = (props) => {
-  const { onChange, ...inputProps } = commonInputProps(props);
+  const { onChange, readOnly, disabled, ...inputProps } = commonInputProps(props);
   const selected = props.options.find((option) => valuesEqual(props.controllerField.value, option.value));
   return (
     <select
       {...inputProps}
+      disabled={disabled || readOnly}
       value={selected === undefined ? '' : String(selected.value)}
       onChange={(event) => {
         const next = props.options.find((option) => String(option.value) === event.target.value);
