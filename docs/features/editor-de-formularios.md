@@ -19,6 +19,8 @@ El formulario vive como una **definición JSON** que atraviesa cuatro piezas:
 
 Flujo de autoría: crear → editar → **Guardar** (borrador) → **Publicar** (versión inmutable). El host consume siempre la última versión publicada; la vista previa del CMS consume el borrador.
 
+Una vez publicado, el formulario se puede sacar de circulación sin despublicarlo: ver [pausa de formularios](pausa-de-formularios.md). Publicar una versión nueva no reactiva un formulario pausado, y la vista previa del borrador sigue funcionando aunque lo esté.
+
 ### Estructura
 
 Una definición tiene **contenedores**, y cada contenedor tiene **campos**. Un contenedor puede ser una sección normal (`kind: 'section'`) o una [grilla repetible](grillas-repetibles.md) (`kind: 'repeater'`). El CMS permite editar grillas repetibles que ya existen en una definición, pero no ofrece una acción para crear una nueva.
@@ -142,3 +144,4 @@ El BFF revalida todo contra el contrato al guardar: el editor adelanta el diagn�
 
 - **2026-08-20** — Se agregaron campos de solo lectura, reglas de longitud en todos los tipos de texto, mensajes de error de formato y de tipo, obligatoriedad configurable en columnas de grilla, editor de condiciones con reglas múltiples y todos los operadores, validación de catálogos y de valores por defecto, y validación previa al guardado para regex, duplicados, rangos, máscaras y parámetros no enteros.
 - **2026-08-20** — Se retiró del CMS la acción para crear nuevas grillas repetibles; las grillas existentes siguen siendo editables.
+- **2026-08-20** — El ciclo de autoría suma la pausa: un formulario publicado se puede sacar de circulación y reactivar desde el encabezado del workspace, y el listado lo rotula como "Pausado". Detalle en [pausa de formularios](pausa-de-formularios.md).

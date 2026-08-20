@@ -37,6 +37,11 @@ export class SubmissionsService {
   async submit(publicId: string, version: number, payload: Record<string, unknown>, idempotencyKey: string, uploadSession: string): Promise<SubmissionReceipt> {
     if (!idempotencyKey.trim()) badRequest('Idempotency-Key es obligatorio');
     const form = await this.forms.findForm(publicId);
+    // Antes de validar disponibilidad: un reintento con la misma Idempotency-Key tiene que devolver
+    // el receipt original aunque el formulario se haya pausado en el medio. La submission ya fue
+    // aceptada; responder "pausado" le haría creer al cliente que se perdió algo que sí se guardó.
+    const replay = await this.findByIdempotency(form.id, idempotencyKey);
+    if (replay) return this.toReceipt(replay, publicId, await this.versionNumber(replay.form_version_id));
     const runtime = await this.forms.runtime(publicId, 'published');
     if (runtime.version !== version) conflict('La versión del formulario ya no está publicada');
     const definition = runtime.definition;
@@ -114,6 +119,13 @@ export class SubmissionsService {
     const { data, error } = await this.supabase.db.from('form_versions').select('id').eq('form_id', formId).eq('version_number', version).single();
     if (error || !data) throw new Error(error?.message ?? 'No se encontró la versión');
     return data.id;
+  }
+
+  private async versionNumber(formVersionId: number | null): Promise<number> {
+    if (!formVersionId) return 1;
+    const { data, error } = await this.supabase.db.from('form_versions').select('version_number').eq('id', formVersionId).maybeSingle();
+    if (error) throw new Error(error.message);
+    return data?.version_number ?? 1;
   }
 
   private async findByIdempotency(formId: number, key: string): Promise<SubmissionRow | null> {

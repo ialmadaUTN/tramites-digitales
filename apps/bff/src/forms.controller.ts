@@ -30,6 +30,12 @@ export class FormsController {
   @Post(':formId/publish')
   publish(@Param('formId') formId: string) { return this.forms.publish(formId); }
 
+  @Post(':formId/pause')
+  pause(@Param('formId') formId: string) { return this.forms.pause(formId); }
+
+  @Post(':formId/resume')
+  resume(@Param('formId') formId: string) { return this.forms.resume(formId); }
+
   @Get(':formId/versions')
   versions(@Param('formId') formId: string) { return this.forms.versions(formId); }
 }

@@ -52,11 +52,14 @@ export function CmsApp() {
                 status={workspace.status}
                 saving={workspace.saving}
                 preview={workspace.preview}
+                published={workspace.selected?.published ?? false}
+                paused={workspace.selected?.paused ?? false}
                 onNameChange={workspace.setName}
                 onDefinitionChange={workspace.setDefinition}
                 onTogglePreview={() => workspace.setPreview(!workspace.preview)}
                 onSave={() => void workspace.saveDraft()}
                 onPublish={() => void workspace.publish()}
+                onToggleAvailability={() => void workspace.toggleAvailability()}
               />
 
               {workspace.preview ? (

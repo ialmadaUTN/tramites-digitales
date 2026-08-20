@@ -4,9 +4,9 @@ export type Database = {
   public: {
     Tables: {
       forms: {
-        Row: { id: number; public_id: string; name: string; draft_definition: Json; published_version_id: number | null; created_at: string; updated_at: string };
-        Insert: { id?: never; public_id?: string; name: string; draft_definition?: Json; published_version_id?: number | null; created_at?: string; updated_at?: string };
-        Update: { id?: never; public_id?: string; name?: string; draft_definition?: Json; published_version_id?: number | null; updated_at?: string };
+        Row: { id: number; public_id: string; name: string; draft_definition: Json; published_version_id: number | null; paused_at: string | null; created_at: string; updated_at: string };
+        Insert: { id?: never; public_id?: string; name: string; draft_definition?: Json; published_version_id?: number | null; paused_at?: string | null; created_at?: string; updated_at?: string };
+        Update: { id?: never; public_id?: string; name?: string; draft_definition?: Json; published_version_id?: number | null; paused_at?: string | null; updated_at?: string };
         Relationships: [];
       };
       form_versions: {

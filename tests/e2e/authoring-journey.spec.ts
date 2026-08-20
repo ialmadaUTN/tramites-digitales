@@ -88,4 +88,33 @@ test('un formulario creado en el CMS se publica y se completa en el host', async
 
   await expect(page.getByText('Gestión recibida')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(/Número de submission:/)).toBeVisible();
+
+  // --- Pausar y reactivar --------------------------------------------------
+  // El recorrido de disponibilidad va acá y no en un spec aparte: necesita
+  // exactamente el mismo montaje (un formulario publicado y funcionando), y
+  // levantar los cuatro servidores otra vez para repetirlo no aporta nada.
+  await page.goto('/');
+  await expect(page.locator('.form-item').first()).toBeVisible({ timeout: 20_000 });
+  await page.locator('.form-item').filter({ hasText: formName }).click();
+  await expect(page.getByRole('heading', { name: 'Estructura del Formulario' })).toBeVisible({ timeout: 20_000 });
+
+  await page.getByRole('button', { name: 'Pausar' }).click();
+  await expect(page.getByText('Formulario pausado')).toBeVisible({ timeout: 20_000 });
+  // El listado tiene que reflejar el estado nuevo, no el anterior.
+  await expect(page.locator('.form-item').filter({ hasText: formName }).getByText('Pausado')).toBeVisible();
+
+  // El host deja de entregar la definición y muestra el mensaje del BFF.
+  await page.goto(hostHref!);
+  await expect(page.getByText('Este formulario no está disponible en este momento')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Solicitud de prueba' })).toHaveCount(0);
+
+  // Reactivar devuelve el formulario a circulación.
+  await page.goto('/');
+  await expect(page.locator('.form-item').first()).toBeVisible({ timeout: 20_000 });
+  await page.locator('.form-item').filter({ hasText: formName }).click();
+  await page.getByRole('button', { name: 'Reactivar' }).click();
+  await expect(page.getByText('Formulario reactivado')).toBeVisible({ timeout: 20_000 });
+
+  await page.goto(hostHref!);
+  await expect(page.getByRole('heading', { name: 'Solicitud de prueba' })).toBeVisible({ timeout: 20_000 });
 });
