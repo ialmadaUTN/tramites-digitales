@@ -1,7 +1,10 @@
 import { valuesEqual } from '@tramites/form-contracts';
+import { isInteractive } from './common-props';
 import type { FieldRenderer } from './types';
 
-export const renderMultiselectField: FieldRenderer = ({ field, controllerField, enabled, options }) => {
+export const renderMultiselectField: FieldRenderer = (props) => {
+  const { field, controllerField, options } = props;
+  const interactive = isInteractive(props);
   const selected = Array.isArray(controllerField.value) ? controllerField.value : [];
   return (
     <div className="multi-select-group" role="group" aria-label={field.label}>
@@ -13,7 +16,7 @@ export const renderMultiselectField: FieldRenderer = ({ field, controllerField, 
               id={id}
               type="checkbox"
               checked={selected.some((value) => valuesEqual(value, option.value))}
-              disabled={!enabled}
+              disabled={!interactive}
               onChange={(event) => {
                 const next = event.target.checked
                   ? [...selected, option.value]

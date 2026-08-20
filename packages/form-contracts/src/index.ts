@@ -28,14 +28,27 @@ export type MaskKind = z.infer<typeof maskKindSchema>;
 export const allowedMimeTypeSchema = z.enum(['application/pdf', 'image/jpeg', 'image/png']);
 export type AllowedMimeType = z.infer<typeof allowedMimeTypeSchema>;
 
+export * from './field-rules.js';
+import {
+  CATALOG_FIELD_TYPES,
+  defaultValuesOutsideCatalog,
+  duplicateOptionValues,
+  isMaskCompatible,
+  isValidRegexPattern,
+  MULTI_VALUE_FIELD_TYPES,
+  READ_ONLY_UNSUPPORTED_FIELD_TYPES,
+  REPEATER_FIELD_TYPES,
+  TEXT_LENGTH_FIELD_TYPES,
+} from './field-rules.js';
+
 export const fieldNameSchema = z
   .string()
   .min(1, 'El nombre de clave es obligatorio')
   .regex(FIELD_NAME_PATTERN, FIELD_NAME_INVALID_MESSAGE);
 
 export const optionSchema = z.object({
-  label: z.string().min(1),
-  value: z.union([z.string(), z.number()]),
+  label: z.string().trim().min(1, 'La etiqueta de la opción es obligatoria'),
+  value: z.union([z.string().trim().min(1, 'El valor de la opción es obligatorio'), z.number()]),
 });
 export type FormOption = z.infer<typeof optionSchema>;
 
@@ -78,6 +91,8 @@ export const conditionRuleSchema = z.object({
   operator: conditionOperatorSchema,
   value: z.unknown().optional(),
 });
+
+export type ConditionRule = z.infer<typeof conditionRuleSchema>;
 
 export const conditionGroupSchema = z.object({
   logic: z.enum(['all', 'any']),
@@ -123,6 +138,12 @@ export const formFieldSchema = z.object({
   placeholder: z.string().optional(),
   helpText: z.string().optional(),
   defaultValue: defaultValueSchema.optional(),
+  /**
+   * Campo visible pero no editable. El runtime bloquea la entrada y el
+   * validador ignora lo que llegue del cliente: siempre se persiste
+   * `defaultValue`, así un payload manipulado no puede sobrescribirlo.
+   */
+  readOnly: z.boolean().optional(),
   width: z.enum(['full', 'half']).default('full'),
   options: z.array(optionSchema).optional(),
   maskKind: maskKindSchema.optional(),
@@ -150,7 +171,7 @@ export type FormContainer = z.infer<typeof formContainerSchema>;
 export const formDefinitionSchema = z
   .object({
     schemaVersion: z.literal(2).optional(),
-    tipificationKey: z.string().min(1).optional(),
+    tipificationKey: z.string().trim().min(1).optional(),
     title: z.string().min(1).max(200),
     description: z.string().optional(),
     submitLabel: z.string().min(1).max(80).default('Enviar'),
@@ -159,20 +180,7 @@ export const formDefinitionSchema = z
   .superRefine((definition, ctx) => {
     const isV2 = definition.schemaVersion === 2;
     const v2FieldTypes = new Set<FieldType>(['email', 'phone', 'alphabetic', 'alphanumeric', 'multiselect', 'fileUpload']);
-    const repeaterFieldTypes = new Set<FieldType>([
-      'text',
-      'email',
-      'phone',
-      'alphabetic',
-      'alphanumeric',
-      'number',
-      'date',
-      'time',
-      'checkbox',
-      'radio',
-      'select',
-      'combobox',
-    ]);
+    const repeaterFieldTypes = new Set<FieldType>(REPEATER_FIELD_TYPES);
     const fieldIds = new Set<string>();
     const allFieldIds = new Set<string>();
     const fieldNames = new Set<string>();
@@ -231,8 +239,41 @@ export const formDefinitionSchema = z
           fieldNames.add(field.fieldName);
           fieldsById.set(field.id, field);
         }
-        if (['select', 'radio', 'combobox', 'multiselect'].includes(field.type) && (!field.options || field.options.length === 0)) {
+        if (CATALOG_FIELD_TYPES.includes(field.type) && (!field.options || field.options.length === 0)) {
           ctx.addIssue({ code: 'custom', path: [...fieldPath, 'options'], message: `${field.type} requiere opciones` });
+        }
+        for (const duplicate of duplicateOptionValues(field.options)) {
+          ctx.addIssue({ code: 'custom', path: [...fieldPath, 'options'], message: `Valor de opción duplicado: ${duplicate}` });
+        }
+        for (const outsider of defaultValuesOutsideCatalog(field)) {
+          ctx.addIssue({ code: 'custom', path: [...fieldPath, 'defaultValue'], message: `El valor por defecto ${outsider} no pertenece al catálogo de opciones` });
+        }
+        if (Array.isArray(field.defaultValue) && !MULTI_VALUE_FIELD_TYPES.includes(field.type)) {
+          ctx.addIssue({ code: 'custom', path: [...fieldPath, 'defaultValue'], message: `${field.type} no admite un valor por defecto múltiple` });
+        }
+        if (field.rules.pattern !== undefined && !isValidRegexPattern(field.rules.pattern)) {
+          ctx.addIssue({ code: 'custom', path: [...fieldPath, 'rules', 'pattern'], message: 'La expresión regular no es válida' });
+        }
+        if (field.rules.minLength !== undefined && field.rules.maxLength !== undefined && field.rules.minLength > field.rules.maxLength) {
+          ctx.addIssue({ code: 'custom', path: [...fieldPath, 'rules', 'minLength'], message: 'El mínimo de caracteres no puede superar el máximo' });
+        }
+        if (field.rules.min !== undefined && field.rules.max !== undefined && field.rules.min > field.rules.max) {
+          ctx.addIssue({ code: 'custom', path: [...fieldPath, 'rules', 'min'], message: 'El mínimo numérico no puede superar el máximo' });
+        }
+        if ((field.rules.minLength !== undefined || field.rules.maxLength !== undefined) && !TEXT_LENGTH_FIELD_TYPES.includes(field.type)) {
+          ctx.addIssue({ code: 'custom', path: [...fieldPath, 'rules', 'minLength'], message: `${field.type} no admite reglas de longitud` });
+        }
+        if ((field.rules.min !== undefined || field.rules.max !== undefined) && field.type !== 'number') {
+          ctx.addIssue({ code: 'custom', path: [...fieldPath, 'rules', 'min'], message: `${field.type} no admite rangos numéricos` });
+        }
+        if (field.readOnly && READ_ONLY_UNSUPPORTED_FIELD_TYPES.includes(field.type)) {
+          ctx.addIssue({ code: 'custom', path: [...fieldPath, 'readOnly'], message: `${field.type} no admite solo lectura` });
+        }
+        if (field.readOnly && field.rules.required && field.defaultValue === undefined) {
+          ctx.addIssue({ code: 'custom', path: [...fieldPath, 'defaultValue'], message: 'Un campo obligatorio de solo lectura necesita un valor por defecto' });
+        }
+        if (field.readOnly && !isV2) {
+          ctx.addIssue({ code: 'custom', path: [...fieldPath, 'readOnly'], message: 'Los campos de solo lectura requieren schemaVersion 2' });
         }
         if (field.type === 'combobox' && field.allowCustomValue === undefined && isV2) {
           ctx.addIssue({ code: 'custom', path: [...fieldPath, 'allowCustomValue'], message: 'Los combobox v2 deben declarar allowCustomValue' });
@@ -249,8 +290,8 @@ export const formDefinitionSchema = z
             ctx.addIssue({ code: 'custom', path: [...fieldPath, 'minFiles'], message: 'minFiles no puede superar maxFiles' });
           }
         }
-        if (field.maskKind && !['text', 'phone', 'alphabetic', 'alphanumeric'].includes(field.type)) {
-          ctx.addIssue({ code: 'custom', path: [...fieldPath, 'maskKind'], message: 'maskKind solo aplica a campos de texto' });
+        if (field.maskKind && !isMaskCompatible(field.type, field.maskKind)) {
+          ctx.addIssue({ code: 'custom', path: [...fieldPath, 'maskKind'], message: `${field.maskKind} no es compatible con el tipo ${field.type}` });
         }
         if (!isV2 && (v2FieldTypes.has(field.type) || field.maskKind !== undefined || field.allowCustomValue !== undefined)) {
           ctx.addIssue({ code: 'custom', path: [...fieldPath, 'type'], message: `${field.type} requiere schemaVersion 2` });

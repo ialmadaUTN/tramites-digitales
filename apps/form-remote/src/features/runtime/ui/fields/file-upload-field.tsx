@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import type { UploadReference } from '@tramites/form-contracts';
+import { isFieldReadOnly, type UploadReference } from '@tramites/form-contracts';
 import type { FieldRenderer } from './types';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png']);
 
 function FileUploadControl({ field, controllerField, enabled, uploadFile }: Parameters<FieldRenderer>[0]) {
+  const interactive = enabled && !isFieldReadOnly(field);
   const [busy, setBusy] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const files = Array.isArray(controllerField.value) ? controllerField.value as UploadReference[] : [];
@@ -17,7 +18,7 @@ function FileUploadControl({ field, controllerField, enabled, uploadFile }: Para
         type="file"
         accept="application/pdf,image/jpeg,image/png"
         multiple={maxFiles > 1}
-        disabled={!enabled || busy || !uploadFile}
+        disabled={!interactive || busy || !uploadFile}
         onChange={async (event) => {
           const selected = Array.from(event.target.files ?? []);
           setUploadError(null);

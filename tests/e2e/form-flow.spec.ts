@@ -13,7 +13,7 @@ test('carga el formulario por ID desde el host federado', async ({ page }) => {
 test('permite crear un formulario desde el CMS', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('button', { name: /Denuncia de siniestro/ })).toBeVisible({ timeout: 15_000 });
-  await page.getByRole('button', { name: '+ Nuevo formulario' }).click();
+  await page.getByRole('button', { name: 'Nuevo formulario', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Estructura del formulario' })).toBeVisible({ timeout: 15_000 });
   await expect(page.locator('input').nth(1)).toHaveValue('Nuevo formulario');
 });

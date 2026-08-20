@@ -5,18 +5,22 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./default-value-validation": "./src/default-value-validation.ts",
     "./field-name": "./src/field-name.ts",
+    "./field-rules": "./src/field-rules.ts",
     "./validation": "./src/validation.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "lint": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "4.0.18",
     "typescript": "7.0.2",
     "vitest": "4.0.18"
   }

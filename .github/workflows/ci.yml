@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Un push nuevo sobre la misma rama cancela la corrida anterior: no tiene
+# sentido esperar resultados de un commit que ya quedó viejo.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # engines del repo: >=22 <25
+  NODE_VERSION: '22'
+
+jobs:
+  verify:
+    name: Tipos y tests unitarios
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        # La versión sale del campo `packageManager` del package.json raíz.
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: Chequeo de tipos
+        run: pnpm lint
+
+      - name: Tests unitarios con cobertura
+        # Falla si algún paquete baja de su umbral declarado en vitest.config.ts.
+        run: pnpm test:coverage
+
+      - name: Publicar reportes de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: |
+            packages/*/coverage/
+            apps/*/coverage/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  e2e:
+    name: End to end
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: verify
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      SUPABASE_DB_SCHEMA: ${{ secrets.SUPABASE_DB_SCHEMA || 'public' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      # Los e2e levantan el stack completo contra un Supabase real. Sin las
+      # credenciales configuradas el job se salta en vez de fallar, así que un
+      # fork o un repo recién clonado no queda con el CI en rojo por algo que
+      # no puede resolver.
+      - name: ¿Hay credenciales de Supabase?
+        id: guard
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SECRET_KEY" ]; then
+            echo "Faltan los secrets SUPABASE_URL / SUPABASE_SECRET_KEY: se omiten los e2e."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: pnpm/action-setup@v4
+        if: steps.guard.outputs.run == 'true'
+
+      - uses: actions/setup-node@v5
+        if: steps.guard.outputs.run == 'true'
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Instalar dependencias
+        if: steps.guard.outputs.run == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Instalar navegador de Playwright
+        if: steps.guard.outputs.run == 'true'
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Preparar variables del BFF
+        if: steps.guard.outputs.run == 'true'
+        # El BFF lee `.env.local` desde la raíz del workspace.
+        run: |
+          {
+            echo "SUPABASE_URL=$SUPABASE_URL"
+            echo "SUPABASE_SECRET_KEY=$SUPABASE_SECRET_KEY"
+            echo "SUPABASE_DB_SCHEMA=$SUPABASE_DB_SCHEMA"
+          } > .env.local
+
+      - name: Tests end to end
+        if: steps.guard.outputs.run == 'true'
+        run: pnpm test:e2e
+
+      - name: Publicar reporte de Playwright
+        if: always() && steps.guard.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore

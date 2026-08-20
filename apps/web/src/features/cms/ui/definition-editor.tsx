@@ -108,7 +108,9 @@ export function DefinitionEditor({ definition, editorErrors, setDefinition }: De
                   <input
                     type="number"
                     min={0}
+                    step={1}
                     value={container.minRows ?? 0}
+                    className={editorErrors.containers[container.id]?.rows ? 'invalid' : undefined}
                     onChange={(event) => setDefinition(updateContainer(definition, container.id, (current) => ({ ...current, minRows: Number(event.target.value) })))}
                   />
                 </div>
@@ -118,7 +120,9 @@ export function DefinitionEditor({ definition, editorErrors, setDefinition }: De
                     type="number"
                     min={1}
                     max={50}
+                    step={1}
                     value={container.maxRows ?? 10}
+                    className={editorErrors.containers[container.id]?.rows ? 'invalid' : undefined}
                     onChange={(event) => setDefinition(updateContainer(definition, container.id, (current) => ({ ...current, maxRows: Number(event.target.value) })))}
                   />
                   {editorErrors.containers[container.id]?.rows && <span className="field-error">{editorErrors.containers[container.id]?.rows}</span>}
@@ -138,6 +142,10 @@ export function DefinitionEditor({ definition, editorErrors, setDefinition }: De
               </select>
             </div>
           </div>
+
+          {editorErrors.containers[container.id]?.fields && (
+            <span className="field-error">{editorErrors.containers[container.id]?.fields}</span>
+          )}
 
           <div style={{ marginTop: 14 }}>
             {container.fields.map((field, fieldIndex) => (

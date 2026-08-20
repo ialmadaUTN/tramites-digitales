@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { FormOption } from '@tramites/form-contracts';
+import { duplicateOptionValues } from '@tramites/form-contracts/field-rules';
 import {
   addOption,
   moveOption,
@@ -14,8 +15,22 @@ import {
 
 type OptionsEditorProps = {
   options: FormOption[] | undefined;
+  error?: string;
   onChange: (options: FormOption[]) => void;
 };
+
+/** Marca por fila lo que el editor rechaza al guardar: etiqueta/valor vacío o repetido. */
+function optionRowIssues(options: FormOption[]): { label?: string; value?: string }[] {
+  const duplicates = new Set(duplicateOptionValues(options));
+  return options.map((option) => ({
+    label: option.label.trim() ? undefined : 'Falta la etiqueta',
+    value: !String(option.value).trim()
+      ? 'Falta el valor'
+      : duplicates.has(String(option.value).trim())
+        ? 'Valor repetido'
+        : undefined,
+  }));
+}
 
 const PRESETS: Record<string, { label: string; options: FormOption[] }> = {
   yesNo: {
@@ -43,9 +58,10 @@ const PRESETS: Record<string, { label: string; options: FormOption[] }> = {
   },
 };
 
-export function OptionsEditor({ options = [], onChange }: OptionsEditorProps) {
+export function OptionsEditor({ options = [], error, onChange }: OptionsEditorProps) {
   const [mode, setMode] = useState<'visual' | 'text'>('visual');
   const [rawText, setRawText] = useState(() => serializeOptions(options));
+  const issues = useMemo(() => optionRowIssues(options), [options]);
 
   const handleModeChange = (newMode: 'visual' | 'text') => {
     if (newMode === 'text') {
@@ -120,6 +136,7 @@ export function OptionsEditor({ options = [], onChange }: OptionsEditorProps) {
           </svg>
           <span>Opciones configuradas</span>
           <span className="badge badge-info">{options.length} {options.length === 1 ? 'opción' : 'opciones'}</span>
+          {error && <span className="badge badge-warning">Revisar</span>}
         </div>
 
         <div className="segmented-control">
@@ -184,23 +201,27 @@ export function OptionsEditor({ options = [], onChange }: OptionsEditorProps) {
                     <div className="option-field-wrap">
                       <input
                         type="text"
-                        className="option-input"
+                        className={`option-input${issues[index]?.label ? ' invalid' : ''}`}
+                        aria-invalid={Boolean(issues[index]?.label)}
                         value={opt.label}
                         onChange={(e) => handleLabelChange(index, e.target.value)}
                         placeholder={`Ej. Opción ${index + 1}`}
                       />
+                      {issues[index]?.label && <span className="field-error">{issues[index]?.label}</span>}
                     </div>
 
                     <div className="option-field-wrap">
                       <div className="option-value-input-container">
                         <input
                           type="text"
-                          className="option-input option-input-code"
+                          className={`option-input option-input-code${issues[index]?.value ? ' invalid' : ''}`}
+                          aria-invalid={Boolean(issues[index]?.value)}
                           value={opt.value}
                           onChange={(e) => handleValueChange(index, e.target.value)}
                           placeholder={`opcion_${index + 1}`}
                         />
                       </div>
+                      {issues[index]?.value && <span className="field-error">{issues[index]?.value}</span>}
                     </div>
 
                     <div className="option-row-actions">

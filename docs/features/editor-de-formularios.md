@@ -1,0 +1,143 @@
+# Editor de formularios (CMS)
+
+> **Mantené este documento al día.** Si cambiás un tipo de campo, una regla, un límite o un mensaje, actualizá la sección correspondiente y sumá una línea al historial del final, en el mismo cambio que toca el código.
+
+## Qué resuelve
+
+Permite a una persona de negocio armar un formulario de trámite sin escribir código: definir qué campos pide, cómo se validan, cómo se llama cada clave del payload que va a recibir Dynamics, y publicarlo para que cualquier portal lo cargue por ID.
+
+## Cómo funciona
+
+El formulario vive como una **definición JSON** que atraviesa cuatro piezas:
+
+| Pieza | Rol |
+| --- | --- |
+| `packages/form-contracts` | Define qué es una definición válida y qué es un envío válido. Es la fuente de verdad; el CMS y el BFF validan contra el mismo esquema. |
+| `apps/web` (CMS) | Edita la definición y la valida **antes** de guardarla, para que el autor vea el problema junto al campo. |
+| `apps/bff` | Persiste borradores, publica versiones y valida cada envío contra la versión publicada. |
+| `apps/form-remote` | Renderiza la definición publicada como formulario real, cargado por Module Federation. |
+
+Flujo de autoría: crear → editar → **Guardar** (borrador) → **Publicar** (versión inmutable). El host consume siempre la última versión publicada; la vista previa del CMS consume el borrador.
+
+### Estructura
+
+Una definición tiene **contenedores**, y cada contenedor tiene **campos**. Un contenedor puede ser una sección normal (`kind: 'section'`) o una [grilla repetible](grillas-repetibles.md) (`kind: 'repeater'`).
+
+Cada campo aporta una clave al payload final mediante su `fieldName`, que debe ser un identificador simple (empieza con letra o `_`, solo letras, números y `_`) y único dentro de su ámbito.
+
+### Versiones de esquema
+
+- **v1**: formato original, sigue soportado para lo ya publicado.
+- **v2**: requiere `tipificationKey` y habilita `email`, `phone`, `alphabetic`, `alphanumeric`, `multiselect`, `fileUpload`, máscaras, `allowCustomValue`, campos de solo lectura y grillas repetibles.
+
+Al abrir un formulario v1 en el CMS se migra a v2 en memoria; lo publicado no se toca hasta el próximo guardado.
+
+## Tipos de campo y qué admite cada uno
+
+| Tipo | Longitud | Rango numérico | Máscara | Catálogo | Solo lectura | En grilla |
+| --- | :-: | :-: | :-: | :-: | :-: | :-: |
+| `text` | ✓ | | ✓ | | ✓ | ✓ |
+| `textarea` | ✓ | | | | ✓ | |
+| `email` | ✓ | | | | ✓ | ✓ |
+| `phone` | ✓ | | ✓ | | ✓ | ✓ |
+| `alphabetic` | ✓ | | | | ✓ | ✓ |
+| `alphanumeric` | ✓ | | | | ✓ | ✓ |
+| `number` | | ✓ | | | ✓ | ✓ |
+| `date` | | | | | ✓ | ✓ |
+| `time` | | | | | ✓ | ✓ |
+| `checkbox` | | | | | ✓ | ✓ |
+| `select` | | | | ✓ | ✓ | ✓ |
+| `radio` | | | | ✓ | ✓ | ✓ |
+| `combobox` | | | | ✓ | ✓ | ✓ |
+| `multiselect` | | | | ✓ | ✓ | |
+| `fileUpload` | | | | | | |
+
+Las listas viven en `packages/form-contracts/src/field-rules.ts` y el CMS las reexporta desde `apps/web/src/features/cms/model/constants.ts`, para que el editor no pueda ofrecer algo que el contrato después rechaza.
+
+### Máscaras
+
+Se normaliza a dígitos antes de validar y de persistir, y se muestra formateado.
+
+| Máscara | Tipos compatibles | Regla |
+| --- | --- | --- |
+| `phone_ar` | `text`, `phone` | 8 a 15 dígitos |
+| `dni_ar` | `text` | 7 u 8 dígitos |
+| `cuit_ar` | `text` | 11 dígitos |
+| `cbu` | `text` | 22 dígitos |
+
+La compatibilidad está en `MASK_COMPATIBILITY`; el editor solo ofrece las máscaras válidas para el tipo elegido.
+
+### Catálogos de opciones
+
+`select`, `radio`, `combobox` y `multiselect` requieren al menos una opción. Cada opción tiene **etiqueta visible** y **valor interno** (el que viaja en el payload).
+
+El editor marca por fila las opciones sin etiqueta, sin valor o con valor repetido, y bloquea el guardado.
+
+`combobox` declara además `allowCustomValue`:
+- `true`: acepta texto fuera del listado.
+- `false` (estricto): solo valores del catálogo, verificado también en el envío.
+
+### Valores por defecto
+
+Se eligen según el tipo, no como texto libre:
+- Catálogo (`select`, `radio`, `multiselect`, `combobox` estricto): se seleccionan del catálogo.
+- `checkbox`: marcado / sin marcar.
+- `number`, `date`, `time`: control del tipo correspondiente.
+- Resto: texto libre.
+
+Al cambiar el tipo de un campo, el valor por defecto se conserva **solo si sigue siendo representable** en el tipo nuevo; si no, se descarta junto con las reglas incompatibles (`changeFieldType` en `apps/web/src/features/cms/model/definition.ts`).
+
+### Archivos adjuntos
+
+`fileUpload` acepta entre 1 y 5 archivos, de tipos PDF, JPG y PNG, hasta 10 MB cada uno. Los tipos permitidos se eligen en el editor. No admite valor por defecto ni solo lectura.
+
+## Reglas de validación configurables
+
+Por campo se puede configurar:
+
+- **Obligatoriedad** (también en cada columna de una grilla).
+- **Longitud** mínima y máxima, en los tipos de texto.
+- **Rango numérico** mínimo y máximo, en `number`.
+- **Expresión regular**.
+- **Mensajes de error propios** para: obligatorio, mínimo/máximo de caracteres, mínimo/máximo numérico, formato inválido (cubre tanto el formato nativo del tipo como la regex) y tipo de dato incorrecto.
+
+## Validación previa al guardado
+
+El editor reproduce las reglas del contrato y muestra el error **junto al campo**, bloqueando el guardado. `collectDefinitionEditorErrors` en `apps/web/src/features/cms/model/editor-validation.ts` cubre:
+
+| Qué detecta | Mensaje |
+| --- | --- |
+| Regex que no compila | La expresión regular no es válida |
+| Opciones duplicadas / sin etiqueta / sin valor | Valores de opción duplicados… · Hay opciones sin etiqueta visible · Hay opciones sin valor interno |
+| Valor por defecto fuera del catálogo | El valor por defecto no está en el catálogo… |
+| Longitud invertida, negativa o no entera | El mínimo de caracteres no puede superar el máximo · La longitud debe expresarse en números enteros |
+| Rango numérico invertido o en tipo no numérico | El mínimo numérico no puede superar el máximo · Solo los campos numéricos admiten un rango |
+| Máscara incompatible con el tipo | `<máscara>` no es compatible con el tipo `<tipo>` |
+| Archivos: cantidad fuera de rango o no entera | Se admiten entre 1 y 5 archivos |
+| Solo lectura mal configurado | Ver [Campos de solo lectura](campos-de-solo-lectura.md) |
+| Claves de payload duplicadas o inválidas | Este nombre de clave ya se usa en otro campo |
+| Condiciones incompletas o mal apuntadas | Ver [Lógica condicional](logica-condicional.md) |
+| Grilla sin columnas o con filas inconsistentes | Ver [Grillas repetibles](grillas-repetibles.md) |
+
+El BFF revalida todo contra el contrato al guardar: el editor adelanta el diagnóstico, no lo reemplaza.
+
+## Restricciones conocidas
+
+- Los `<label>` del editor no están asociados a sus controles (`htmlFor`), así que los tests consultan por grupo. Es deuda de accesibilidad pendiente.
+- Al crear un formulario, el editor se muestra antes de que termine de cargar el borrador; lo que se escriba en esa ventana se pierde.
+
+## Dónde mirar
+
+| Qué | Dónde |
+| --- | --- |
+| Esquema de la definición | `packages/form-contracts/src/index.ts` |
+| Listas y chequeos compartidos con el CMS | `packages/form-contracts/src/field-rules.ts` |
+| Validación de envíos | `packages/form-contracts/src/validation.ts` |
+| Mutaciones de la definición | `apps/web/src/features/cms/model/definition.ts` |
+| Validación previa al guardado | `apps/web/src/features/cms/model/editor-validation.ts` |
+| Editor de campo | `apps/web/src/features/cms/ui/field-editor.tsx` |
+| Tablas de reglas (tests) | `packages/form-contracts/src/rules.test.ts` |
+
+## Historial de cambios
+
+- **2026-08-20** — Se agregaron campos de solo lectura, reglas de longitud en todos los tipos de texto, mensajes de error de formato y de tipo, obligatoriedad configurable en columnas de grilla, editor de condiciones con reglas múltiples y todos los operadores, validación de catálogos y de valores por defecto, y validación previa al guardado para regex, duplicados, rangos, máscaras y parámetros no enteros.

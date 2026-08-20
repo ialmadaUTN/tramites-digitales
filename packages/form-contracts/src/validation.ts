@@ -1,4 +1,5 @@
 import { z } from 'zod';
+export { validateFieldDefaultValue } from './default-value-validation.js';
 import {
   flattenFields,
   FormContainer,
@@ -7,6 +8,7 @@ import {
   FormOption,
   FormValue,
   isFieldEnabled,
+  isFieldReadOnly,
   isFieldRequired,
   isFieldVisible,
   isRepeaterValue,
@@ -202,6 +204,36 @@ function validateRepeater(container: FormContainer, value: unknown, ctx: z.Refin
   });
 }
 
+function overrideReadOnlyCells(fields: FormField[], row: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...row };
+  for (const field of fields) {
+    if (!isFieldReadOnly(field)) continue;
+    if (field.defaultValue === undefined) delete next[field.fieldName];
+    else next[field.fieldName] = field.defaultValue;
+  }
+  return next;
+}
+
+/**
+ * Reemplaza lo que llegó del cliente para cada campo de solo lectura por el
+ * `defaultValue` declarado en la definición. Un payload manipulado no puede
+ * alterar esos valores: se ignoran en lugar de rechazar el envío.
+ */
+export function applyReadOnlyDefaults(definition: FormDefinition, payload: Record<string, unknown>): Record<string, unknown> {
+  const next = overrideReadOnlyCells(flattenFields(definition), payload);
+  for (const container of repeaterContainers(definition)) {
+    const readOnlyCells = container.fields.filter(isFieldReadOnly);
+    const rows = container.fieldName ? next[container.fieldName] : undefined;
+    if (!container.fieldName || readOnlyCells.length === 0 || !Array.isArray(rows)) continue;
+    next[container.fieldName] = rows.map((row) =>
+      row && typeof row === 'object' && !Array.isArray(row)
+        ? overrideReadOnlyCells(container.fields, row as Record<string, unknown>)
+        : row,
+    );
+  }
+  return next;
+}
+
 export function buildSubmissionSchema(definition: FormDefinition) {
   const shape: Record<string, z.ZodTypeAny> = {};
   for (const field of flattenFields(definition)) shape[field.fieldName] = z.unknown().optional();
@@ -259,7 +291,7 @@ function normalizeRepeaterValue(container: FormContainer, value: unknown): FormV
 }
 
 export function validateSubmission(definition: FormDefinition, payload: Record<string, unknown>): ValidationResult {
-  const parsed = buildSubmissionSchema(definition).safeParse(payload);
+  const parsed = buildSubmissionSchema(definition).safeParse(applyReadOnlyDefaults(definition, payload));
   if (!parsed.success) {
     const errors: Record<string, string> = {};
     for (const issue of parsed.error.issues) {
