@@ -77,26 +77,6 @@ export function addContainer(definition: FormDefinition): FormDefinition {
   };
 }
 
-export function addRepeater(definition: FormDefinition): FormDefinition {
-  return {
-    ...definition,
-    schemaVersion: 2,
-    containers: [
-      ...definition.containers,
-      {
-        id: createId('repeater'),
-        title: 'Nueva grilla',
-        kind: 'repeater',
-        fieldName: `rows${definition.containers.length + 1}`,
-        columns: 1,
-        minRows: 0,
-        maxRows: 10,
-        fields: [],
-      },
-    ],
-  };
-}
-
 export function removeContainer(definition: FormDefinition, containerId: string): FormDefinition {
   return { ...definition, containers: definition.containers.filter((container) => container.id !== containerId) };
 }

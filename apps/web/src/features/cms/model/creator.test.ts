@@ -6,7 +6,6 @@ import { INITIAL_DEFINITION } from './constants';
 import {
   addConditionRule,
   addField,
-  addRepeater,
   changeFieldType,
   otherFields,
   setFieldCondition,
@@ -37,9 +36,30 @@ function baseDefinition(): FormDefinition {
   return structuredClone(INITIAL_DEFINITION);
 }
 
-/** Crea una grilla con una columna del tipo indicado y devuelve los ids resultantes. */
+/** Fixture de una definición existente que ya contiene una grilla. */
+function definitionWithRepeater(): FormDefinition {
+  const definition = baseDefinition();
+  return {
+    ...definition,
+    containers: [
+      ...definition.containers,
+      {
+        id: 'repeater-1',
+        title: 'Filas existentes',
+        kind: 'repeater',
+        fieldName: 'rows',
+        columns: 1,
+        minRows: 0,
+        maxRows: 10,
+        fields: [],
+      },
+    ],
+  };
+}
+
+/** Agrega una columna a una grilla existente y devuelve los ids resultantes. */
 function withRepeater(type: FormField['type'] = 'text') {
-  let definition = addRepeater(baseDefinition());
+  let definition = definitionWithRepeater();
   const container = lastContainer(definition);
   definition = addField(definition, container.id);
   const cell = lastField(lastContainer(definition));
@@ -47,22 +67,9 @@ function withRepeater(type: FormField['type'] = 'text') {
   return { definition, containerId: container.id, cellId: cell.id };
 }
 
-describe('creación de grillas repetibles', () => {
-  it('crea una grilla con clave de payload, límites de filas y columnas propias', () => {
-    const { definition, containerId, cellId } = withRepeater('number');
-    const container = definition.containers.find((entry) => entry.id === containerId)!;
-
-    expect(container.kind).toBe('repeater');
-    expect(container.fieldName).toMatch(/^rows\d+$/);
-    expect(container.minRows).toBe(0);
-    expect(container.maxRows).toBe(10);
-    expect(findField(definition, cellId).type).toBe('number');
-    expect(contractErrors(definition)).toEqual([]);
-    expect(collectDefinitionEditorErrors(definition, 'Formulario').hasErrors).toBe(false);
-  });
-
+describe('validación de grillas repetibles existentes', () => {
   it('marca una grilla sin columnas y los límites de filas inconsistentes', () => {
-    const empty = addRepeater(baseDefinition());
+    const empty = definitionWithRepeater();
     expect(collectDefinitionEditorErrors(empty, 'Formulario').containers[lastContainer(empty).id]?.fields).toMatch(
       /al menos una columna/,
     );

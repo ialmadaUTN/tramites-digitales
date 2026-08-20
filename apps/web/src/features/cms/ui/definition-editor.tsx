@@ -1,7 +1,7 @@
 'use client';
 
 import type { FormDefinition } from '@tramites/form-contracts';
-import { addContainer, addField, addRepeater, moveContainer, removeContainer, updateContainer } from '../model/definition';
+import { addContainer, addField, moveContainer, removeContainer, updateContainer } from '../model/definition';
 import type { DefinitionEditorErrors } from '../model/editor-validation';
 import { FieldEditor } from './field-editor';
 
@@ -31,9 +31,6 @@ export function DefinitionEditor({ definition, editorErrors, setDefinition }: De
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
           Nuevo Contenedor
-        </button>
-        <button className="button secondary" onClick={() => setDefinition(addRepeater(definition))}>
-          + Nueva Grilla Repetible
         </button>
         </div>
       </div>

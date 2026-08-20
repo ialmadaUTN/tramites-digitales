@@ -40,12 +40,38 @@ function renderEditor(initial: FormDefinition = structuredClone(INITIAL_DEFINITI
   };
 }
 
+function definitionWithRepeater(): FormDefinition {
+  const definition = structuredClone(INITIAL_DEFINITION);
+  return {
+    ...definition,
+    containers: [
+      ...definition.containers,
+      {
+        id: 'repeater-1',
+        title: 'Filas existentes',
+        kind: 'repeater',
+        fieldName: 'rows',
+        columns: 1,
+        minRows: 0,
+        maxRows: 10,
+        fields: [],
+      },
+    ],
+  };
+}
+
 /** El contenedor N-ésimo del editor, para acotar las consultas. */
 function containerBox(index: number): HTMLElement {
   return document.querySelectorAll('.container-editor')[index] as HTMLElement;
 }
 
 describe('DefinitionEditor', () => {
+  it('no ofrece crear una grilla repetible nueva', () => {
+    renderEditor();
+
+    expect(screen.queryByRole('button', { name: /Nueva Grilla Repetible/ })).toBeNull();
+  });
+
   it('agrega un contenedor nuevo al final', async () => {
     const editor = renderEditor();
     const before = editor.definition.containers.length;
@@ -56,23 +82,8 @@ describe('DefinitionEditor', () => {
     expect(editor.definition.containers.at(-1)?.kind).toBe('section');
   });
 
-  it('agrega una grilla repetible con clave de payload y límites de fila', async () => {
-    const editor = renderEditor();
-
-    await editor.user.click(screen.getByRole('button', { name: /Nueva Grilla Repetible/ }));
-
-    const grid = editor.definition.containers.at(-1)!;
-    expect(grid.kind).toBe('repeater');
-    expect(grid.fieldName).toMatch(/^rows\d+$/);
-    expect(grid.minRows).toBe(0);
-    expect(grid.maxRows).toBe(10);
-    expect(editor.definition.schemaVersion).toBe(2);
-  });
-
-  it('la grilla recién creada muestra sus propios controles de fila', async () => {
-    const editor = renderEditor();
-    await editor.user.click(screen.getByRole('button', { name: /Nueva Grilla Repetible/ }));
-
+  it('una grilla existente muestra sus propios controles de fila', () => {
+    renderEditor(definitionWithRepeater());
     const grid = containerBox(1);
     expect(within(grid).getByText('Clave de payload de la grilla')).toBeTruthy();
     expect(within(grid).getByText('Mínimo de filas')).toBeTruthy();
@@ -81,9 +92,8 @@ describe('DefinitionEditor', () => {
     expect(within(grid).getByText(/al menos una columna/)).toBeTruthy();
   });
 
-  it('agregar una columna a la grilla la vuelve una definición válida', async () => {
-    const editor = renderEditor();
-    await editor.user.click(screen.getByRole('button', { name: /Nueva Grilla Repetible/ }));
+  it('agregar una columna a una grilla existente la vuelve una definición válida', async () => {
+    const editor = renderEditor(definitionWithRepeater());
     await editor.user.click(within(containerBox(1)).getByRole('button', { name: /Agregar Campo/ }));
 
     expect(editor.definition.containers.at(-1)?.fields).toHaveLength(1);
@@ -91,9 +101,8 @@ describe('DefinitionEditor', () => {
     expect(formDefinitionSchema.safeParse(editor.definition).success).toBe(true);
   });
 
-  it('un mínimo de filas mayor al máximo se reporta en el acto', async () => {
-    const editor = renderEditor();
-    await editor.user.click(screen.getByRole('button', { name: /Nueva Grilla Repetible/ }));
+  it('un mínimo de filas mayor al máximo se reporta en el acto en una grilla existente', async () => {
+    const editor = renderEditor(definitionWithRepeater());
     const grid = containerBox(1);
     const minRows = within(grid).getByText('Mínimo de filas').closest('.form-group')!.querySelector('input')!;
 

@@ -27,6 +27,8 @@ Cada objeto del arreglo es una fila; sus claves son los `fieldName` de las colum
 
 ### Configuración
 
+Las grillas ya presentes en una definición se pueden editar desde el CMS. La acción para crear una grilla repetible nueva no está disponible en el editor.
+
 | Opción | Qué hace |
 | --- | --- |
 | Clave de payload | `fieldName` de la grilla. Comparte espacio de nombres con los campos sueltos del formulario: no puede repetirse con ninguno. |
@@ -88,3 +90,4 @@ Si la grilla exige un mínimo y no llegó ninguna fila, el error se reporta a ni
 ## Historial de cambios
 
 - **2026-08-20** — Se habilitó configurar la obligatoriedad por columna desde el CMS (antes el editor la ocultaba en las celdas, aunque el contrato y el validador ya la soportaban). Se agregaron validación inmediata de mínimo y máximo de filas, marca de columna obligatoria en el encabezado, error por celda con resalte, y control del valor por defecto según el tipo de cada columna.
+- **2026-08-20** — Se retiró del CMS la acción para crear nuevas grillas repetibles; las grillas existentes siguen siendo editables.

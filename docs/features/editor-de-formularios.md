@@ -21,7 +21,7 @@ Flujo de autoría: crear → editar → **Guardar** (borrador) → **Publicar** 
 
 ### Estructura
 
-Una definición tiene **contenedores**, y cada contenedor tiene **campos**. Un contenedor puede ser una sección normal (`kind: 'section'`) o una [grilla repetible](grillas-repetibles.md) (`kind: 'repeater'`).
+Una definición tiene **contenedores**, y cada contenedor tiene **campos**. Un contenedor puede ser una sección normal (`kind: 'section'`) o una [grilla repetible](grillas-repetibles.md) (`kind: 'repeater'`). El CMS permite editar grillas repetibles que ya existen en una definición, pero no ofrece una acción para crear una nueva.
 
 Cada campo aporta una clave al payload final mediante su `fieldName`, que debe ser un identificador simple (empieza con letra o `_`, solo letras, números y `_`) y único dentro de su ámbito.
 
@@ -141,3 +141,4 @@ El BFF revalida todo contra el contrato al guardar: el editor adelanta el diagn�
 ## Historial de cambios
 
 - **2026-08-20** — Se agregaron campos de solo lectura, reglas de longitud en todos los tipos de texto, mensajes de error de formato y de tipo, obligatoriedad configurable en columnas de grilla, editor de condiciones con reglas múltiples y todos los operadores, validación de catálogos y de valores por defecto, y validación previa al guardado para regex, duplicados, rangos, máscaras y parámetros no enteros.
+- **2026-08-20** — Se retiró del CMS la acción para crear nuevas grillas repetibles; las grillas existentes siguen siendo editables.
