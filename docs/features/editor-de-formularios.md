@@ -19,6 +19,8 @@ El formulario vive como una **definición JSON** que atraviesa cuatro piezas:
 
 Flujo de autoría: crear → editar → **Guardar** (borrador) → **Publicar** (versión inmutable). El host consume siempre la última versión publicada; la vista previa del CMS consume el borrador.
 
+Los recorridos E2E que crean formularios (`tests/e2e/authoring-journey.spec.ts` y `tests/e2e/form-flow.spec.ts`) usan formularios reales para verificar el CMS y la cadena CMS → BFF → Supabase → host. Cada `afterEach` registra el ID desde el momento de la creación y elimina sus submissions, los uploads cuando el schema REST los expone y el formulario al terminar, incluso si una aserción posterior falla; las versiones publicadas se eliminan por cascade de la base.
+
 ### Estructura
 
 Una definición tiene **contenedores**, y cada contenedor tiene **campos**. Un contenedor puede ser una sección normal (`kind: 'section'`) o una [grilla repetible](grillas-repetibles.md) (`kind: 'repeater'`). El CMS permite editar grillas repetibles que ya existen en una definición, pero no ofrece una acción para crear una nueva.
@@ -140,5 +142,6 @@ El BFF revalida todo contra el contrato al guardar: el editor adelanta el diagn�
 
 ## Historial de cambios
 
+- **2026-08-21** — El E2E de autoría limpia el formulario creado y sus dependencias al finalizar para no acumular datos de prueba publicados.
 - **2026-08-20** — Se agregaron campos de solo lectura, reglas de longitud en todos los tipos de texto, mensajes de error de formato y de tipo, obligatoriedad configurable en columnas de grilla, editor de condiciones con reglas múltiples y todos los operadores, validación de catálogos y de valores por defecto, y validación previa al guardado para regex, duplicados, rangos, máscaras y parámetros no enteros.
 - **2026-08-20** — Se retiró del CMS la acción para crear nuevas grillas repetibles; las grillas existentes siguen siendo editables.

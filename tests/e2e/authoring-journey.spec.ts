@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { deleteE2eForm } from './support/supabase-cleanup';
 
 /**
  * Recorrido completo de autoría: armar un formulario en el CMS, publicarlo y
@@ -21,6 +22,14 @@ function fieldEditor(page: Page, index: number) {
   return page.locator('.field-editor').nth(index);
 }
 
+let createdFormId: string | undefined;
+
+test.afterEach(async () => {
+  const formId = createdFormId;
+  createdFormId = undefined;
+  if (formId) await deleteE2eForm(formId);
+});
+
 test('un formulario creado en el CMS se publica y se completa en el host', async ({ page }) => {
   const formName = `E2E autoría ${Date.now()}`;
 
@@ -36,6 +45,12 @@ test('un formulario creado en el CMS se publica y se completa en el host', async
   // respuesta pisa `name` y `definition`. Hasta que no aparece el aviso de
   // creado, lo que se escriba se pierde.
   await expect(page.getByText('Formulario creado')).toBeVisible({ timeout: 20_000 });
+
+  // Registramos el ID apenas se crea, para que afterEach también pueda limpiar
+  // si una aserción posterior falla.
+  const hostHref = await page.getByRole('link', { name: 'Abrir Host' }).getAttribute('href');
+  expect(hostHref).toMatch(/^\/host\/[0-9a-f-]{36}$/);
+  createdFormId = hostHref!.slice('/host/'.length);
 
   // --- Datos generales -----------------------------------------------------
   await formGroup(page, 'Nombre interno (gestión)').locator('input').fill(formName);
@@ -63,10 +78,6 @@ test('un formulario creado en el CMS se publica y se completa en el host', async
 
   await page.getByRole('button', { name: 'Publicar' }).click();
   await expect(page.getByText('Versión publicada')).toBeVisible({ timeout: 20_000 });
-
-  // El enlace al host lleva el id del formulario recién creado.
-  const hostHref = await page.getByRole('link', { name: 'Abrir Host' }).getAttribute('href');
-  expect(hostHref).toMatch(/^\/host\/[0-9a-f-]{36}$/);
 
   // --- Completar en el host federado ---------------------------------------
   await page.goto(hostHref!);
