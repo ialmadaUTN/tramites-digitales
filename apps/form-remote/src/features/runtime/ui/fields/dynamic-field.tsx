@@ -1,6 +1,6 @@
 import { Controller } from 'react-hook-form';
 import type { FormField } from '@tramites/form-contracts';
-import { isFieldEnabled, isFieldReadOnly, isFieldRequired, isFieldVisible } from '@tramites/form-contracts';
+import { isFieldEffectivelyRequired, isFieldEnabled, isFieldReadOnly, isFieldVisible } from '@tramites/form-contracts';
 import type { FormValues } from '../../../../shared/types/form-values';
 import { valuesByFieldId } from '../../model/field-state';
 import type { FieldControlProps } from './types';
@@ -17,7 +17,9 @@ export function DynamicField({ field, control, values, errors, fieldMap, uploadF
   const byId = valuesByFieldId(fieldMap, values);
   if (!isFieldVisible(field, byId)) return null;
   const enabled = isFieldEnabled(field, byId);
-  const required = isFieldRequired(field, byId);
+  // Efectiva, no declarada: un campo deshabilitado no se exige, así que mostrarle
+  // el asterisco sería prometer una validación que el servidor no va a hacer.
+  const required = isFieldEffectivelyRequired(field, byId);
   const error = errors[field.fieldName]?.message;
   const options = field.options ?? [];
   const renderField = getFieldRenderer(field.type);

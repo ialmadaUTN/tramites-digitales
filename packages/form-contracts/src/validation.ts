@@ -7,9 +7,9 @@ import {
   FormField,
   FormOption,
   FormValue,
+  isFieldEffectivelyRequired,
   isFieldEnabled,
   isFieldReadOnly,
-  isFieldRequired,
   isFieldVisible,
   isRepeaterValue,
   isUploadReference,
@@ -245,8 +245,10 @@ export function buildSubmissionSchema(definition: FormDefinition) {
     for (const field of flattenFields(definition)) byId[field.id] = values[field.fieldName];
     for (const field of flattenFields(definition)) {
       const value = values[field.fieldName];
+      // Oculto o deshabilitado: no se exige ni se valida nada. Es la misma regla
+      // que `isFieldEffectivelyRequired` expone al renderer.
       if (!isFieldVisible(field, byId) || !isFieldEnabled(field, byId)) continue;
-      if (isFieldRequired(field, byId) && empty(value)) {
+      if (isFieldEffectivelyRequired(field, byId) && empty(value)) {
         ctx.addIssue({ code: 'custom', path: [field.fieldName], message: message(field, 'required', 'Este campo es obligatorio') });
         continue;
       }

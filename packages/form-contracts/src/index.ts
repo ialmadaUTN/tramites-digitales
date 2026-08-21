@@ -2,6 +2,8 @@ import { z } from 'zod';
 export type { Database, Json } from './database.types.js';
 export { FIELD_NAME_INVALID_MESSAGE, FIELD_NAME_PATTERN, fieldNameError } from './field-name.js';
 import { FIELD_NAME_INVALID_MESSAGE, FIELD_NAME_PATTERN } from './field-name.js';
+export { REQUIRED_CONFLICT_MESSAGE, hasRequiredConflict } from './required-semantics.js';
+import { hasRequiredConflict, REQUIRED_CONFLICT_MESSAGE } from './required-semantics.js';
 
 export const fieldTypeSchema = z.enum([
   'text',
@@ -251,6 +253,9 @@ export const formDefinitionSchema = z
         if (Array.isArray(field.defaultValue) && !MULTI_VALUE_FIELD_TYPES.includes(field.type)) {
           ctx.addIssue({ code: 'custom', path: [...fieldPath, 'defaultValue'], message: `${field.type} no admite un valor por defecto múltiple` });
         }
+        if (hasRequiredConflict(field)) {
+          ctx.addIssue({ code: 'custom', path: [...fieldPath, 'conditions', 'required'], message: REQUIRED_CONFLICT_MESSAGE });
+        }
         if (field.rules.pattern !== undefined && !isValidRegexPattern(field.rules.pattern)) {
           ctx.addIssue({ code: 'custom', path: [...fieldPath, 'rules', 'pattern'], message: 'La expresión regular no es válida' });
         }
@@ -491,8 +496,29 @@ export function isFieldEnabled(field: FormField, values: Record<string, unknown>
   return evaluateCondition(field.conditions?.enabled, values);
 }
 
+/**
+ * Obligatoriedad **declarada**: fija o condicional. El contrato garantiza que no
+ * pueden estar las dos (ver `required-semantics.ts`), así que el `||` no arrastra
+ * ninguna ambigüedad: solo una de las dos ramas puede estar configurada.
+ *
+ * Ojo: esto no dice si el campo se exige *ahora*. Para eso está
+ * `isFieldEffectivelyRequired`, que es lo que tienen que usar el validador y la UI.
+ */
 export function isFieldRequired(field: FormField, values: Record<string, unknown>): boolean {
   return Boolean(field.rules.required) || evaluateCondition(field.conditions?.required, values) && Boolean(field.conditions?.required);
+}
+
+/**
+ * Si el campo se exige de verdad con los valores actuales.
+ *
+ * Un campo oculto o deshabilitado **no se exige** y no viaja en el payload,
+ * aunque sea obligatorio fijo: "obligatorio" significa "obligatorio cuando está
+ * visible y habilitado". Es el único criterio válido, y lo comparten el
+ * validador de envíos y el renderer, para que el asterisco que ve el usuario
+ * signifique exactamente lo que el servidor va a exigir.
+ */
+export function isFieldEffectivelyRequired(field: FormField, values: Record<string, unknown>): boolean {
+  return isFieldVisible(field, values) && isFieldEnabled(field, values) && isFieldRequired(field, values);
 }
 
 export function cleanSubmissionPayload(definition: FormDefinition, payload: Record<string, unknown>): Record<string, FormValue> {
