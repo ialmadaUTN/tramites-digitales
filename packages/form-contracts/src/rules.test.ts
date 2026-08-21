@@ -3,6 +3,7 @@ import {
   cleanSubmissionPayload,
   evaluateCondition,
   formDefinitionSchema,
+  publishableFormDefinitionSchema,
   isFormValue,
   isRepeaterRow,
   isUploadReference,
@@ -209,5 +210,57 @@ describe('valores por defecto configurados en el CMS', () => {
   it('respeta los mensajes de error personalizados', () => {
     expect(validateFieldDefaultValue(field({ type: 'email', defaultValue: 'x', rules: { errorMessages: { pattern: 'Mail mal escrito' } } })))
       .toBe('Mail mal escrito');
+  });
+});
+
+/**
+ * Completitud estructural. Son dos esquemas a propósito: el base también valida
+ * las **lecturas**, así que tiene que seguir aceptando lo incompleto — un
+ * borrador vacío ya guardado no puede romper el listado del CMS.
+ */
+describe('completitud estructural: base acepta, publicable rechaza', () => {
+  const base = { schemaVersion: 2 as const, tipificationKey: 'generic@v1', title: 'T', submitLabel: 'Enviar' };
+  const section = (fields: FormField[] = [field()]) => ({ id: 'c1', title: 'Sección', kind: 'section' as const, columns: 1 as const, fields });
+  const repeater = (fields: FormField[] = []) => ({ id: 'r1', title: 'Grilla', kind: 'repeater' as const, fieldName: 'filas', columns: 1 as const, fields });
+
+  const cases: Array<[string, unknown, RegExp | undefined]> = [
+    ['formulario sin contenedores', { ...base, containers: [] }, /al menos un contenedor/],
+    ['sección sin campos', { ...base, containers: [section([])] }, /al menos un campo/],
+    ['grilla sin columnas', { ...base, containers: [repeater()] }, /al menos una columna/],
+    ['formulario mínimo válido', { ...base, containers: [section()] }, undefined],
+    ['sección con campos y grilla con columnas', { ...base, containers: [section(), repeater([field({ id: 'f2', fieldName: 'celda' })])] }, undefined],
+  ];
+
+  it.each(cases)('%s', (_name, definition, expected) => {
+    // El esquema base nunca rechaza por completitud: es el que se usa al leer.
+    expect(formDefinitionSchema.safeParse(definition).success).toBe(true);
+
+    const result = publishableFormDefinitionSchema.safeParse(definition);
+    if (expected === undefined) {
+      expect(result.success).toBe(true);
+      return;
+    }
+    expect(result.success).toBe(false);
+    expect(result.error!.issues.some((issue) => expected.test(issue.message))).toBe(true);
+  });
+
+  it('señala el contenedor exacto que está vacío y no los sanos', () => {
+    // Sin esto el error podría estar apuntando a cualquier lado y el editor
+    // marcaría el contenedor equivocado.
+    const definition = {
+      ...base,
+      containers: [section(), { ...section([]), id: 'c2', title: 'Vacía' }],
+    };
+    const result = publishableFormDefinitionSchema.safeParse(definition);
+
+    expect(result.success).toBe(false);
+    expect(result.error!.issues).toHaveLength(1);
+    expect(result.error!.issues[0]!.path).toEqual(['containers', 1, 'fields']);
+  });
+
+  it('un formulario sin contenedores reporta solo ese problema', () => {
+    const result = publishableFormDefinitionSchema.safeParse({ ...base, containers: [] });
+    expect(result.error!.issues).toHaveLength(1);
+    expect(result.error!.issues[0]!.path).toEqual(['containers']);
   });
 });

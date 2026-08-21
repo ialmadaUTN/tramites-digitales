@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { flattenFields, formDefinitionSchema, FormDefinition, RuntimeFormResponse, validateDefinition } from '@tramites/form-contracts';
+import { flattenFields, formDefinitionSchema, FormDefinition, publishableFormDefinitionSchema, RuntimeFormResponse, validateDefinition } from '@tramites/form-contracts';
 import { assertFormAvailable } from './form-availability';
 import { badRequest, conflict, notFound } from './http-error';
 import { SupabaseService } from './supabase.service';
@@ -44,6 +44,8 @@ export class FormsService {
   async publish(publicId: string) {
     const form = await this.findForm(publicId);
     const definition = this.parseDefinition(form.draft_definition);
+    // Los borradores incompletos se guardan; lo que no se puede es publicarlos.
+    this.assertPublishable(definition);
     if (flattenFields(definition).some((field) => field.type === 'fileUpload') && (
       process.env.FORM_UPLOADS_ENABLED !== 'true'
       || process.env.FORM_UPLOADS_AUTHENTICATED !== 'true'
@@ -121,6 +123,16 @@ export class FormsService {
     if (error) throw new Error(error.message);
     if (!data) notFound(`No existe el formulario ${publicId}`);
     return data;
+  }
+
+  /**
+   * Completitud estructural. Va aparte de `parseDefinition` porque ese se usa
+   * también para leer: si rechazara definiciones incompletas, un borrador vacío
+   * ya guardado rompería el listado del CMS entero.
+   */
+  private assertPublishable(definition: FormDefinition): void {
+    const result = publishableFormDefinitionSchema.safeParse(definition);
+    if (!result.success) badRequest('La definición no está completa para publicar', result.error.flatten());
   }
 
   private parseDefinition(value: unknown): FormDefinition {

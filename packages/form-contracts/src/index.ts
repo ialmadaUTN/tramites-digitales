@@ -2,6 +2,15 @@ import { z } from 'zod';
 export type { Database, Json } from './database.types.js';
 export { FIELD_NAME_INVALID_MESSAGE, FIELD_NAME_PATTERN, fieldNameError } from './field-name.js';
 import { FIELD_NAME_INVALID_MESSAGE, FIELD_NAME_PATTERN } from './field-name.js';
+export {
+  EMPTY_CONTAINER_MESSAGE,
+  EMPTY_FORM_MESSAGE,
+  EMPTY_REPEATER_MESSAGE,
+  isPublishable,
+  structuralIssues,
+  type StructuralIssue,
+} from './structural-validation.js';
+import { structuralIssues } from './structural-validation.js';
 
 export const fieldTypeSchema = z.enum([
   'text',
@@ -336,6 +345,19 @@ export const formDefinitionSchema = z
     for (const fieldId of fieldsById.keys()) visit(fieldId, []);
   });
 export type FormDefinition = z.infer<typeof formDefinitionSchema>;
+
+/**
+ * Definición lista para publicar: el esquema base **más** la completitud
+ * estructural. Es un esquema aparte y no una regla más del base porque el base
+ * también valida las lecturas; ver `structural-validation.ts`.
+ *
+ * Guardar un borrador usa `formDefinitionSchema`; publicar usa este.
+ */
+export const publishableFormDefinitionSchema = formDefinitionSchema.superRefine((definition, ctx) => {
+  for (const issue of structuralIssues(definition)) {
+    ctx.addIssue({ code: 'custom', path: issue.path, message: issue.message });
+  }
+});
 
 /**
  * Upgrades a legacy definition when it enters the CMS. Published v1 versions

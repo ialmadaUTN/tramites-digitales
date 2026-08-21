@@ -3,12 +3,20 @@ import { FormsService } from './forms.service';
 import { TipificationRegistry } from './tipification.registry';
 import type { SupabaseService } from './supabase.service';
 
+// Estructuralmente completa: `publish()` valida completitud, y a estos casos les
+// interesa la pausa, no la estructura (eso se cubre en `forms.service.structure.test.ts`).
 const DEFINITION = {
   schemaVersion: 2 as const,
   tipificationKey: 'generic',
   title: 'Denuncia',
   submitLabel: 'Enviar',
-  containers: [],
+  containers: [{
+    id: 'c1',
+    title: 'Datos',
+    kind: 'section' as const,
+    columns: 1 as const,
+    fields: [{ id: 'f1', fieldName: 'nombre', type: 'text' as const, label: 'Nombre', width: 'full' as const, rules: {} }],
+  }],
 };
 
 type FormRecord = {

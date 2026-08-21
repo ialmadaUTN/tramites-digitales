@@ -8,6 +8,7 @@
     "./default-value-validation": "./src/default-value-validation.ts",
     "./field-name": "./src/field-name.ts",
     "./field-rules": "./src/field-rules.ts",
+    "./structural-validation": "./src/structural-validation.ts",
     "./validation": "./src/validation.ts"
   },
   "scripts": {

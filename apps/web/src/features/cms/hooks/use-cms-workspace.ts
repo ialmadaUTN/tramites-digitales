@@ -96,6 +96,13 @@ export function useCmsWorkspace(api: FormsApi = formsApi) {
 
   async function publish() {
     if (!selectedId) return;
+    // Un borrador incompleto se guarda pero no se publica: el aviso tiene que
+    // decir qué falta, no fallar recién contra el BFF.
+    if (!editorErrors.canPublish) {
+      setPreview(false);
+      setStatus({ text: editorErrors.structure ?? 'Completá los contenedores marcados antes de publicar', error: true });
+      return;
+    }
     const saved = await saveDraft();
     if (!saved) return;
     setSaving(true);
