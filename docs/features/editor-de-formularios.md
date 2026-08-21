@@ -97,7 +97,7 @@ Al cambiar el tipo de un campo, el valor por defecto se conserva **solo si sigue
 
 Por campo se puede configurar:
 
-- **Obligatoriedad** (también en cada columna de una grilla).
+- **Obligatoriedad** (también en cada columna de una grilla). Es fija o condicional, nunca las dos: ver [Lógica condicional](logica-condicional.md#compatibilidad-con-la-obligatoriedad-fija).
 - **Longitud** mínima y máxima, en los tipos de texto.
 - **Rango numérico** mínimo y máximo, en `number`.
 - **Expresión regular**.
@@ -119,6 +119,7 @@ El editor reproduce las reglas del contrato y muestra el error **junto al campo*
 | Solo lectura mal configurado | Ver [Campos de solo lectura](campos-de-solo-lectura.md) |
 | Claves de payload duplicadas o inválidas | Este nombre de clave ya se usa en otro campo |
 | Condiciones incompletas o mal apuntadas | Ver [Lógica condicional](logica-condicional.md) |
+| Obligatoriedad fija y condicional a la vez | Un campo obligatorio no puede tener además obligatoriedad condicional: dejá solo una de las dos |
 | Grilla sin columnas o con filas inconsistentes | Ver [Grillas repetibles](grillas-repetibles.md) |
 
 El BFF revalida todo contra el contrato al guardar: el editor adelanta el diagnóstico, no lo reemplaza.

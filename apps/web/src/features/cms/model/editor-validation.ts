@@ -1,6 +1,7 @@
 import type { FormContainer, FormDefinition, FormField } from '@tramites/form-contracts';
 import { duplicateOptionValues, isMaskCompatible, isValidRegexPattern, optionCatalogIncludes } from '@tramites/form-contracts/field-rules';
 import { fieldNameError } from '@tramites/form-contracts/field-name';
+import { hasRequiredConflict, REQUIRED_CONFLICT_MESSAGE } from '@tramites/form-contracts/required-semantics';
 import { validateFieldDefaultValue } from '@tramites/form-contracts/default-value-validation';
 import {
   LENGTH_RULE_FIELD_TYPES,
@@ -139,6 +140,9 @@ function conditionErrors(field: FormField, insideRepeater: boolean, candidateIds
   const groups = Object.entries(field.conditions ?? {}).filter(([, group]) => group);
   if (groups.length === 0) return undefined;
   if (insideRepeater) return 'Las celdas de una grilla no admiten condiciones';
+  // Cubre las definiciones que ya venían con las dos activas: el editor ahora
+  // impide llegar a este estado, pero un borrador viejo puede tenerlo.
+  if (hasRequiredConflict(field)) return REQUIRED_CONFLICT_MESSAGE;
   for (const [, group] of groups) {
     if (!group || group.rules.length === 0) return 'Cada condición necesita al menos una regla';
     for (const rule of group.rules) {

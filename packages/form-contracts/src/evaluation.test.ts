@@ -4,9 +4,11 @@ import {
   evaluateCondition,
   formDefinitionSchema,
   isFormValue,
+  isFieldEffectivelyRequired,
   isRepeaterRow,
   isUploadReference,
   type ConditionOperator,
+  type FormField,
 } from './index';
 import { validateSubmission } from './validation';
 
@@ -192,5 +194,81 @@ describe('type guards del payload', () => {
     expect(cleanSubmissionPayload(definition, { campo: 'ok', filas: [{ celda: 'a' }] })).toEqual({ campo: 'ok', filas: [{ celda: 'a' }] });
     expect(cleanSubmissionPayload(definition, { campo: { objeto: 1 }, filas: 'no-es-grilla' })).toEqual({});
     expect(cleanSubmissionPayload(definition, { campo: '' })).toEqual({});
+  });
+});
+
+/**
+ * Semántica de la obligatoriedad. La regla única: un campo se exige solo si está
+ * **visible y habilitado**; oculto o deshabilitado no se exige ni viaja en el
+ * payload, aunque sea obligatorio fijo.
+ *
+ * La tabla recorre las cuatro combinaciones de visible × habilitado por cada
+ * forma de declarar obligatoriedad, que es lo que pedía el criterio de aceptación.
+ */
+describe('obligatoriedad efectiva: visible, oculto, habilitado, deshabilitado', () => {
+  const gate = { id: 'gate', fieldName: 'gate', type: 'text' as const, label: 'Gate', width: 'full' as const, rules: {} };
+
+  /** `target` depende de `gate === 'si'` para la dimensión que se esté probando. */
+  function build(overrides: Record<string, unknown>) {
+    return formDefinitionSchema.parse({
+      schemaVersion: 2,
+      tipificationKey: 'generic@v1',
+      title: 'Obligatoriedad',
+      submitLabel: 'Enviar',
+      containers: [{
+        id: 'c1',
+        title: 'Uno',
+        kind: 'section',
+        columns: 1,
+        fields: [gate, { id: 'target', fieldName: 'target', type: 'text', label: 'Target', width: 'full', rules: {}, ...overrides }],
+      }],
+    });
+  }
+
+  const shows = { logic: 'all' as const, rules: [{ fieldId: 'gate', operator: 'equals' as const, value: 'si' }] };
+
+  const cases: Array<{ name: string; definition: unknown; gate: string; exigido: boolean }> = [
+    // Obligatorio fijo, sin condiciones: siempre se exige.
+    { name: 'fijo · sin condiciones', definition: build({ rules: { required: true } }), gate: 'no', exigido: true },
+
+    // Obligatorio fijo + visibilidad condicional = "obligatorio cuando está visible".
+    { name: 'fijo · visible', definition: build({ rules: { required: true }, conditions: { visible: shows } }), gate: 'si', exigido: true },
+    { name: 'fijo · oculto', definition: build({ rules: { required: true }, conditions: { visible: shows } }), gate: 'no', exigido: false },
+
+    // Ídem con la habilitación.
+    { name: 'fijo · habilitado', definition: build({ rules: { required: true }, conditions: { enabled: shows } }), gate: 'si', exigido: true },
+    { name: 'fijo · deshabilitado', definition: build({ rules: { required: true }, conditions: { enabled: shows } }), gate: 'no', exigido: false },
+
+    // Obligatoriedad condicional pura.
+    { name: 'condicional cumplida', definition: build({ conditions: { required: shows } }), gate: 'si', exigido: true },
+    { name: 'condicional incumplida', definition: build({ conditions: { required: shows } }), gate: 'no', exigido: false },
+
+    // Condicional cumplida pero el campo está oculto: manda la visibilidad.
+    {
+      name: 'condicional cumplida pero oculto',
+      definition: build({ conditions: { required: shows, visible: { logic: 'all', rules: [{ fieldId: 'gate', operator: 'equals', value: 'jamas' }] } } }),
+      gate: 'si',
+      exigido: false,
+    },
+  ];
+
+  it.each(cases)('$name → exigido=$exigido', ({ definition, gate: gateValue, exigido }) => {
+    const result = validateSubmission(definition as never, { gate: gateValue, target: '' });
+    const falla = !result.success && Boolean(result.errors.target);
+    expect(falla).toBe(exigido);
+  });
+
+  it.each(cases)('$name · el helper coincide con el validador', ({ definition, gate: gateValue, exigido }) => {
+    // Contrato y runtime tienen que leer lo mismo: el asterisco que ve el usuario
+    // debe significar exactamente lo que el servidor va a exigir.
+    const parsed = definition as { containers: { fields: FormField[] }[] };
+    const target = parsed.containers[0]!.fields.find((f) => f.id === 'target')!;
+    expect(isFieldEffectivelyRequired(target, { gate: gateValue })).toBe(exigido);
+  });
+
+  it('un campo oculto y obligatorio no viaja en el payload', () => {
+    const definition = build({ rules: { required: true }, conditions: { visible: shows } });
+    const payload = cleanSubmissionPayload(definition as never, { gate: 'no', target: 'algo' });
+    expect(payload.target).toBeUndefined();
   });
 });

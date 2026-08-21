@@ -63,6 +63,37 @@ Para `empty` / `notEmpty`, se consideran vacíos: `undefined`, `null`, cadena va
 
 El editor valida antes de guardar que cada regla esté completa: campo válido, valor esperado presente cuando el operador lo pide, y al menos un valor para `in` / `notIn`.
 
+## Compatibilidad con la obligatoriedad fija
+
+Hay dos formas de declarar que un campo es obligatorio, y **son excluyentes**:
+
+| Forma | Dónde |
+| --- | --- |
+| Fija | `rules.required: true` |
+| Condicional | `conditions.required` |
+
+**Declarar las dos está prohibido.** Es ambiguo y falla en silencio: la fija gana y la condición queda muerta, así que el autor cree haber configurado *"obligatorio cuando X"* y en realidad configuró *"siempre obligatorio"*. El contrato lo rechaza aunque se llame a la API directamente, y el editor deshabilita la opción que sobra en cuanto una de las dos está activa.
+
+### La obligatoriedad sí convive con visibilidad y habilitación
+
+Un campo obligatorio con visibilidad o habilitación condicional es una configuración legítima y significa:
+
+> **Obligatorio cuando está visible y habilitado.**
+
+Un campo oculto o deshabilitado **no se exige y no viaja en el payload**, aunque sea obligatorio fijo. Prohibir la combinación obligaría al autor a duplicar la condición de visibilidad dentro de una condición de obligatoriedad, que es peor.
+
+### Un único criterio para las tres capas
+
+`isFieldEffectivelyRequired(field, values)` = visible **y** habilitado **y** obligatorio. Es el único criterio válido y lo comparten:
+
+| Capa | Uso |
+| --- | --- |
+| Contrato | `validateSubmission` lo aplica al exigir un valor |
+| Runtime | el asterisco del `<label>` se pinta con él |
+| CMS | el editor explica la semántica junto a las opciones |
+
+Que el renderer use el mismo helper que el validador es lo que garantiza que **el asterisco signifique exactamente lo que el servidor va a exigir**. Antes se pintaba con la obligatoriedad declarada, así que un campo deshabilitado por condición mostraba `*` y el validador lo salteaba igual.
+
 ## Efecto en el payload
 
 Los campos que quedan invisibles o deshabilitados **no viajan** en el envío: `cleanSubmissionPayload` los descarta. Un campo con obligatoriedad condicional solo se exige cuando su condición se cumple.
@@ -77,7 +108,10 @@ Los campos que quedan invisibles o deshabilitados **no viajan** en el envío: `c
 | Candidatos válidos | `apps/web/src/features/cms/model/definition.ts` (`otherFields`) |
 | Aplicación en runtime | `apps/form-remote/src/features/runtime/ui/fields/dynamic-field.tsx` |
 | Tablas de operadores (tests) | `packages/form-contracts/src/evaluation.test.ts` |
+| Semántica de la obligatoriedad | `packages/form-contracts/src/required-semantics.ts` (`hasRequiredConflict`, `REQUIRED_CONFLICT_MESSAGE`) |
+| Criterio único de exigencia | `packages/form-contracts/src/index.ts` (`isFieldEffectivelyRequired`) |
 
 ## Historial de cambios
 
 - **2026-08-20** — El editor pasó de una única regla con cuatro operadores a reglas múltiples con los diez operadores del contrato, selector visual de lógica `all`/`any` y valores múltiples para `in`/`notIn`. Se corrigió el selector de campos candidatos, que ofrecía celdas de grilla y producía definiciones que el BFF rechazaba.
+- **2026-08-20** — Se fijó la compatibilidad entre obligatoriedad fija y lógica condicional. Declarar `rules.required` junto con `conditions.required` pasó a ser inválido (el contrato lo rechaza y el editor deshabilita la opción que sobra), mientras que la obligatoriedad fija con visibilidad o habilitación condicional queda definida como "obligatorio cuando está visible y habilitado". Se agregó `isFieldEffectivelyRequired` como criterio único: el runtime dejó de mostrar el asterisco en campos deshabilitados, donde el validador nunca exigía nada.
