@@ -62,8 +62,9 @@ export const CONDITION_OPERATORS: { value: ConditionOperator; label: string; val
 ];
 
 export const INITIAL_DEFINITION: FormDefinition = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   tipificationKey: 'generic@v1',
+  externalVariables: [],
   title: 'Nuevo formulario',
   description: 'Descripción del trámite',
   submitLabel: 'Enviar',

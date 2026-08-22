@@ -1,4 +1,5 @@
-import type { ConditionGroup, ConditionRule, FieldType, FormContainer, FormDefinition, FormField, FormOption } from '@tramites/form-contracts';
+import type { ConditionGroup, ConditionRule, ConditionSource, FieldType, FormContainer, FormDefinition, FormField, FormOption, TextBlock } from '@tramites/form-contracts';
+import { containerFields } from '@tramites/form-contracts/field-rules';
 import { defaultValuesOutsideCatalog, isMaskCompatible } from '@tramites/form-contracts/field-rules';
 import {
   LENGTH_RULE_FIELD_TYPES,
@@ -7,7 +8,7 @@ import {
 } from './constants';
 import { createId } from './ids';
 
-export type ConditionKey = 'visible' | 'enabled' | 'required';
+export type ConditionKey = 'visible' | 'enabled' | 'included' | 'required';
 
 function moveItem<T>(items: T[], index: number, offset: -1 | 1): T[] | null {
   const target = index + offset;
@@ -38,6 +39,7 @@ export function updateField(definition: FormDefinition, fieldId: string, update:
     containers: definition.containers.map((container) => ({
       ...container,
       fields: container.fields.map((field) => (field.id === fieldId ? update(field) : field)),
+      items: container.items?.map((item) => item.kind === 'field' && item.field.id === fieldId ? { ...item, field: update(item.field) } : item),
     })),
   };
 }
@@ -54,7 +56,10 @@ export function moveField(definition: FormDefinition, fieldId: string, offset: -
     containers: definition.containers.map((container) => {
       const index = container.fields.findIndex((field) => field.id === fieldId);
       const fields = moveItem(container.fields, index, offset);
-      return fields ? { ...container, fields } : container;
+      if (!fields) return container;
+      const itemIndex = container.items?.findIndex((item) => item.kind === 'field' && item.field.id === fieldId) ?? -1;
+      const items = container.items && itemIndex >= 0 ? moveItem(container.items, itemIndex, offset) ?? container.items : container.items;
+      return { ...container, fields, items };
     }),
   };
 }
@@ -73,7 +78,7 @@ export function createField(index: number): FormField {
 export function addContainer(definition: FormDefinition): FormDefinition {
   return {
     ...definition,
-    containers: [...definition.containers, { id: createId('container'), title: 'Nuevo contenedor', kind: 'section', columns: 1, fields: [] }],
+    containers: [...definition.containers, { id: createId('container'), title: 'Nuevo contenedor', kind: 'section', columns: 1, fields: [], items: [] }],
   };
 }
 
@@ -82,10 +87,14 @@ export function removeContainer(definition: FormDefinition, containerId: string)
 }
 
 export function addField(definition: FormDefinition, containerId: string): FormDefinition {
-  return updateContainer(definition, containerId, (container) => ({
-    ...container,
-    fields: [...container.fields, createField(container.fields.length + 1)],
-  }));
+  return updateContainer(definition, containerId, (container) => {
+    const field = createField(container.fields.length + 1);
+    return {
+      ...container,
+      fields: [...container.fields, field],
+      items: container.items ? [...container.items, { kind: 'field' as const, field }] : undefined,
+    };
+  });
 }
 
 export function removeField(definition: FormDefinition, fieldId: string): FormDefinition {
@@ -94,6 +103,7 @@ export function removeField(definition: FormDefinition, fieldId: string): FormDe
     containers: definition.containers.map((container) => ({
       ...container,
       fields: container.fields.filter((field) => field.id !== fieldId),
+      items: container.items?.filter((item) => item.kind !== 'field' || item.field.id !== fieldId),
     })),
   };
 }
@@ -241,14 +251,65 @@ export function parseOptions(text: string): FormOption[] {
 export function otherFields(definition: FormDefinition, fieldId: string): FormField[] {
   return definition.containers
     .filter((container) => container.kind !== 'repeater')
-    .flatMap((container) => container.fields)
+    .flatMap((container) => containerFields(container))
     .filter((field) => field.id !== fieldId);
 }
 
-export function toggleFieldCondition(field: FormField, key: ConditionKey, enabled: boolean, fallbackFieldId: string): FormField {
+export function externalVariableCandidates(definition: FormDefinition) {
+  return definition.externalVariables ?? [];
+}
+
+export function addExternalVariable(definition: FormDefinition): FormDefinition {
+  const index = (definition.externalVariables ?? []).length + 1;
+  return {
+    ...definition,
+    externalVariables: [...(definition.externalVariables ?? []), { name: `variable${index}`, label: `Variable ${index}`, type: 'string', trust: 'presentation' }],
+  };
+}
+
+export function updateExternalVariable(
+  definition: FormDefinition,
+  name: string,
+  patch: Partial<NonNullable<FormDefinition['externalVariables']>[number]>,
+): FormDefinition {
+  return {
+    ...definition,
+    externalVariables: (definition.externalVariables ?? []).map((variable) => variable.name === name ? { ...variable, ...patch } : variable),
+  };
+}
+
+export function removeExternalVariable(definition: FormDefinition, name: string): FormDefinition {
+  return { ...definition, externalVariables: (definition.externalVariables ?? []).filter((variable) => variable.name !== name) };
+}
+
+export function addTextBlock(definition: FormDefinition, containerId: string): FormDefinition {
+  return updateContainer(definition, containerId, (container) => {
+    const block: TextBlock = { id: createId('text'), kind: 'textBlock', title: 'Información', text: 'Nuevo bloque informativo' };
+    return { ...container, items: [...(container.items ?? container.fields.map((field) => ({ kind: 'field' as const, field }))), block] };
+  });
+}
+
+export function updateTextBlock(definition: FormDefinition, blockId: string, update: (block: TextBlock) => TextBlock): FormDefinition {
+  return {
+    ...definition,
+    containers: definition.containers.map((container) => ({
+      ...container,
+      items: container.items?.map((item) => item.kind === 'textBlock' && item.id === blockId ? update(item) : item),
+    })),
+  };
+}
+
+export function removeTextBlock(definition: FormDefinition, blockId: string): FormDefinition {
+  return {
+    ...definition,
+    containers: definition.containers.map((container) => ({ ...container, items: container.items?.filter((item) => item.kind !== 'textBlock' || item.id !== blockId) })),
+  };
+}
+
+export function toggleFieldCondition(field: FormField, key: ConditionKey, enabled: boolean, fallback: string | ConditionSource): FormField {
   const conditions = { ...(field.conditions ?? {}) };
   if (enabled) {
-    conditions[key] = { logic: 'all', rules: [{ fieldId: fallbackFieldId, operator: 'equals', value: '' }] };
+    conditions[key] = { logic: 'all', rules: [typeof fallback === 'string' ? { fieldId: fallback, operator: 'equals', value: '' } : { source: fallback, operator: 'equals', value: '' }] };
   } else {
     delete conditions[key];
   }
@@ -263,8 +324,28 @@ export function setConditionLogic(condition: ConditionGroup, logic: ConditionGro
   return { ...condition, logic };
 }
 
-export function addConditionRule(condition: ConditionGroup, fallbackFieldId: string): ConditionGroup {
-  return { ...condition, rules: [...condition.rules, { fieldId: fallbackFieldId, operator: 'equals', value: '' }] };
+export function addConditionRule(condition: ConditionGroup, fallback: string | ConditionSource): ConditionGroup {
+  const source = typeof fallback === 'string' ? undefined : fallback;
+  return {
+    ...condition,
+    rules: [...condition.rules, source ? { source, operator: 'equals', value: '' } : { fieldId: fallback as string, operator: 'equals', value: '' }],
+  };
+}
+
+export type ElementConditionKey = 'visible' | 'enabled' | 'included';
+
+export function setContainerCondition(container: FormContainer, key: ElementConditionKey, value: ConditionGroup | undefined): FormContainer {
+  const conditions = { ...(container.conditions ?? {}) };
+  if (value) conditions[key] = value;
+  else delete conditions[key];
+  return { ...container, conditions: Object.keys(conditions).length ? conditions : undefined };
+}
+
+export function setFormCondition(definition: FormDefinition, key: ElementConditionKey, value: ConditionGroup | undefined): FormDefinition {
+  const conditions = { ...(definition.conditions ?? {}) };
+  if (value) conditions[key] = value;
+  else delete conditions[key];
+  return { ...definition, conditions: Object.keys(conditions).length ? conditions : undefined };
 }
 
 export function updateConditionRule(

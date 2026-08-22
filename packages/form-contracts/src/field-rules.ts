@@ -1,5 +1,16 @@
 import type { FieldType, FormField, FormOption, MaskKind } from './index.js';
 
+/** Ordered field/block projection shared by the CMS without loading the barrel. */
+export function containerItems<T, I extends { kind: string }>(container: { fields: T[]; items?: I[] }): Array<I | { kind: 'field'; field: T }> {
+  return container.items ?? container.fields.map((field) => ({ kind: 'field' as const, field }));
+}
+
+export function containerFields<T, I extends { kind: string }>(container: { fields: T[]; items?: I[] }): T[] {
+  return containerItems(container)
+    .filter((item): item is { kind: 'field'; field: T } => item.kind === 'field')
+    .map((item) => item.field);
+}
+
 /**
  * Listas y comprobaciones de integridad que comparten el contrato y el CMS.
  *

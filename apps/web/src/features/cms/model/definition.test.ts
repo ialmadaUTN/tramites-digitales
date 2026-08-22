@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import type { FormDefinition } from '@tramites/form-contracts';
 import {
   addContainer,
+  addExternalVariable,
+  externalVariableCandidates,
   addField,
+  addTextBlock,
+  addConditionRule,
   addOption,
   changeFieldType,
   moveContainer,
@@ -12,11 +16,28 @@ import {
   parseOptions,
   removeContainer,
   removeField,
+  removeExternalVariable,
+  removeTextBlock,
   removeOption,
   serializeOptions,
   slugifyOptionValue,
   toggleFieldCondition,
+  setContainerCondition,
+  setFormCondition,
+  setConditionLogic,
+  updateExternalVariable,
+  updateTextBlock,
   updateOption,
+  updateField,
+  otherFields,
+  setFieldCondition,
+  updateConditionRule,
+  removeConditionRule,
+  toggleDefaultOption,
+  setFieldDefaultValue,
+  setFieldReadOnly,
+  setFieldRule,
+  setFieldErrorMessage,
 } from './definition';
 
 const definition: FormDefinition = {
@@ -94,5 +115,64 @@ describe('definition mutations', () => {
     const enabled = toggleFieldCondition(definition.containers[0]!.fields[0]!, 'visible', true, 'f2');
     expect(enabled.conditions?.visible?.rules[0]?.fieldId).toBe('f2');
     expect(toggleFieldCondition(enabled, 'visible', false, 'f2').conditions).toBeUndefined();
+  });
+
+  it('manages v3 variables and ordered informational blocks', () => {
+    const v3 = { ...definition, schemaVersion: 3 as const, externalVariables: [] };
+    const withVariable = addExternalVariable(v3);
+    expect(withVariable.externalVariables?.[0]?.name).toBe('variable1');
+    const updated = updateExternalVariable(withVariable, 'variable1', { label: 'Código', type: 'number', trust: 'trusted' });
+    expect(updated.externalVariables?.[0]).toMatchObject({ label: 'Código', type: 'number', trust: 'trusted' });
+    expect(removeExternalVariable(updated, 'variable1').externalVariables).toEqual([]);
+    const twoVariables = addExternalVariable(withVariable);
+    expect(updateExternalVariable(twoVariables, 'variable1', { label: 'Uno' }).externalVariables?.[1]?.label).toBe('Variable 2');
+    expect(removeExternalVariable(twoVariables, 'missing').externalVariables).toHaveLength(2);
+
+    const withBlock = addTextBlock(v3, 'c1');
+    const block = withBlock.containers[0]?.items?.find((item) => item.kind === 'textBlock');
+    expect(block?.kind).toBe('textBlock');
+    const changed = updateTextBlock(withBlock, block!.id, (current) => ({ ...current, text: 'Ayuda' }));
+    expect(changed.containers[0]?.items?.find((item) => item.kind === 'textBlock')).toMatchObject({ text: 'Ayuda' });
+    expect(removeTextBlock(changed, block!.id).containers[0]?.items).toHaveLength(2);
+    expect(addTextBlock(v3, 'missing')).toEqual(v3);
+    expect(updateTextBlock(withBlock, 'missing', (current) => current)).toEqual(withBlock);
+    expect(removeTextBlock(withBlock, 'missing')).toEqual(withBlock);
+  });
+
+  it('applies container and form conditions and keeps item order when moving fields', () => {
+    const form = setFormCondition(definition, 'visible', { logic: 'all', rules: [{ fieldId: 'f1', operator: 'notEmpty' }] });
+    expect(form.conditions?.visible).toBeTruthy();
+    const container = setContainerCondition(definition.containers[0]!, 'enabled', { logic: 'all', rules: [{ fieldId: 'f1', operator: 'notEmpty' }] });
+    expect(container.conditions?.enabled).toBeTruthy();
+    const moved = moveField({ ...definition, containers: [{ ...definition.containers[0]!, items: definition.containers[0]!.fields.map((field) => ({ kind: 'field' as const, field })) }, definition.containers[1]!] }, 'f1', 1);
+    expect(moved.containers[0]?.items?.map((item) => item.kind === 'field' ? item.field.id : item.id)).toEqual(['f2', 'f1']);
+    expect(setContainerCondition(container, 'enabled', undefined).conditions).toBeUndefined();
+    expect(setFormCondition(form, 'visible', undefined).conditions).toBeUndefined();
+    expect(externalVariableCandidates(definition)).toEqual([]);
+    expect(externalVariableCandidates({ ...definition, externalVariables: [{ name: 'v', label: 'V', type: 'string', trust: 'presentation' }] })).toHaveLength(1);
+    expect(setConditionLogic({ logic: 'all', rules: [{ fieldId: 'f1', operator: 'notEmpty' }] }, 'any').logic).toBe('any');
+    expect(addConditionRule({ logic: 'all', rules: [{ fieldId: 'f1', operator: 'notEmpty' }] }, { kind: 'external', variable: 'v' }).rules.at(-1)?.source).toEqual({ kind: 'external', variable: 'v' });
+  });
+
+  it('covers ordered-item updates, condition editing and field rule helpers', () => {
+    const ordered = { ...definition, containers: [{ ...definition.containers[0]!, items: definition.containers[0]!.fields.map((field) => ({ kind: 'field' as const, field })) }, definition.containers[1]!] };
+    expect(updateField(ordered, 'f1', (field) => ({ ...field, label: 'Actualizado' })).containers[0]?.items?.[0]).toMatchObject({ kind: 'field', field: { label: 'Actualizado' } });
+    expect(otherFields({ ...definition, containers: [...definition.containers, { id: 'r', title: 'R', kind: 'repeater', columns: 1, fields: [] }] }, 'f1')).toHaveLength(1);
+    const field = definition.containers[0]!.fields[0]!;
+    expect(setFieldCondition(field, 'visible', { logic: 'all', rules: [{ fieldId: 'f2', operator: 'equals', value: 'x' }] }).conditions?.visible).toBeTruthy();
+    const condition = { logic: 'all' as const, rules: [{ fieldId: 'f1', operator: 'equals' as const, value: 'x' }, { fieldId: 'f2', operator: 'equals' as const, value: 'y' }] };
+    expect(updateConditionRule(condition, 1, { value: 'z' }).rules[1]?.value).toBe('z');
+    expect(removeConditionRule(condition, 0).rules).toHaveLength(1);
+    expect(removeConditionRule({ ...condition, rules: condition.rules.slice(0, 1) }, 0)).toEqual({ ...condition, rules: condition.rules.slice(0, 1) });
+    expect(toggleDefaultOption(undefined, 'x', true)).toEqual(['x']);
+    expect(toggleDefaultOption(['x'], 'x', false)).toBeUndefined();
+    expect(setFieldDefaultValue(field, 'x').defaultValue).toBe('x');
+    expect(setFieldDefaultValue(field, undefined).defaultValue).toBeUndefined();
+    expect(setFieldReadOnly(field, true).readOnly).toBe(true);
+    expect(setFieldReadOnly(setFieldReadOnly(field, true), false).readOnly).toBeUndefined();
+    expect(setFieldRule(field, 'required', true).rules.required).toBe(true);
+    expect(setFieldRule(setFieldRule(field, 'required', true), 'required', false).rules.required).toBeUndefined();
+    expect(setFieldErrorMessage(field, 'required', 'Obligatorio').rules.errorMessages?.required).toBe('Obligatorio');
+    expect(setFieldErrorMessage(setFieldErrorMessage(field, 'required', 'Obligatorio'), 'required', ' ').rules.errorMessages).toBeUndefined();
   });
 });

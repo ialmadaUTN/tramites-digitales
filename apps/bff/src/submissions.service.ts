@@ -7,6 +7,7 @@ import { SupabaseService } from './supabase.service';
 import { DeliveryResult, DynamicsClient } from './dynamics.client';
 import { TipificationRegistry } from './tipification.registry';
 import { UploadsService } from './uploads.service';
+import { verifyContextToken } from './context-token';
 
 type SubmissionRow = {
   id: number;
@@ -34,15 +35,21 @@ export class SubmissionsService {
     @Inject(UploadsService) private readonly uploads: UploadsService,
   ) {}
 
-  async submit(publicId: string, version: number, payload: Record<string, unknown>, idempotencyKey: string, uploadSession: string): Promise<SubmissionReceipt> {
+  async submit(publicId: string, version: number, payload: Record<string, unknown>, idempotencyKey: string, uploadSession: string, contextToken?: string): Promise<SubmissionReceipt> {
     if (!idempotencyKey.trim()) badRequest('Idempotency-Key es obligatorio');
     const form = await this.forms.findForm(publicId);
     const runtime = await this.forms.runtime(publicId, 'published');
     if (runtime.version !== version) conflict('La versión del formulario ya no está publicada');
     const definition = runtime.definition;
-    const result = validateSubmission(definition, payload);
+    let context: Record<string, unknown> = {};
+    try {
+      context = verifyContextToken(contextToken, publicId, definition);
+    } catch (error) {
+      badRequest(error instanceof Error ? error.message : 'El contexto del formulario no es válido');
+    }
+    const result = validateSubmission(definition, payload, context);
     if (!result.success) badRequest('El payload no cumple la definición publicada', result.errors);
-    const cleanPayload = cleanSubmissionPayload(definition, result.data);
+    const cleanPayload = cleanSubmissionPayload(definition, result.data, context);
     const formVersionId = runtime.version ? await this.versionId(form.id, runtime.version) : null;
     if (!formVersionId) badRequest('La versión publicada no está disponible');
     await this.uploads.assertSubmissionUploads(publicId, definition, cleanPayload, uploadSession, formVersionId);

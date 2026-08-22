@@ -1,9 +1,11 @@
 'use client';
 
-import type { FormDefinition } from '@tramites/form-contracts';
-import { addContainer, addField, moveContainer, removeContainer, updateContainer } from '../model/definition';
+import type { ConditionGroup, FormDefinition } from '@tramites/form-contracts';
+import { containerFields } from '@tramites/form-contracts/field-rules';
+import { addContainer, addExternalVariable, addField, addTextBlock, moveContainer, removeContainer, removeExternalVariable, removeTextBlock, setContainerCondition, setFormCondition, updateContainer, updateExternalVariable, updateTextBlock } from '../model/definition';
 import type { DefinitionEditorErrors } from '../model/editor-validation';
 import { FieldEditor } from './field-editor';
+import { ConditionEditor } from './condition-editor';
 
 type DefinitionEditorProps = {
   definition: FormDefinition;
@@ -12,6 +14,15 @@ type DefinitionEditorProps = {
 };
 
 export function DefinitionEditor({ definition, editorErrors, setDefinition }: DefinitionEditorProps) {
+  const conditionFields = definition.containers.filter((container) => container.kind !== 'repeater').flatMap((container) => containerFields(container));
+  const toggleElementCondition = (condition: ConditionGroup | undefined, enabled: boolean, candidates = conditionFields): ConditionGroup | undefined => {
+    if (!enabled) return undefined;
+    const fieldId = candidates[0]?.id;
+    const variable = definition.externalVariables?.[0]?.name;
+    if (fieldId) return condition ?? { logic: 'all', rules: [{ source: { kind: 'field', fieldId }, operator: 'equals', value: '' }] };
+    if (variable) return condition ?? { logic: 'all', rules: [{ source: { kind: 'external', variable }, operator: 'equals', value: '' }] };
+    return condition;
+  };
   return (
     <div className="card">
       <div className="toolbar">
@@ -32,6 +43,49 @@ export function DefinitionEditor({ definition, editorErrors, setDefinition }: De
           </svg>
           Nuevo Contenedor
         </button>
+        </div>
+      </div>
+
+      <div className="form-grid" style={{ marginBottom: 18, padding: 14, border: '1px solid var(--line)', borderRadius: 10 }}>
+        <div className="form-group full">
+          <label>Condiciones del formulario</label>
+          <div className="checkbox-row">
+            {(['visible', 'enabled', 'included'] as const).map((key) => (
+              <label key={key}><input type="checkbox" checked={Boolean(definition.conditions?.[key])} onChange={(event) => setDefinition(setFormCondition(definition, key, toggleElementCondition(definition.conditions?.[key], event.target.checked, [])))} />{key === 'visible' ? 'Visibilidad' : key === 'enabled' ? 'Habilitación' : 'Inclusión'}</label>
+            ))}
+          </div>
+          {(['visible', 'enabled', 'included'] as const).map((key) => definition.conditions?.[key] && (
+            <ConditionEditor key={key} label={key === 'visible' ? 'Visibilidad del formulario' : key === 'enabled' ? 'Habilitación del formulario' : 'Inclusión del formulario'} condition={definition.conditions[key]} otherFields={[]} externalVariables={definition.externalVariables} onChange={(value) => setDefinition(setFormCondition(definition, key, value))} />
+          ))}
+          {editorErrors.conditions && <span className="field-error">{editorErrors.conditions}</span>}
+        </div>
+        <div className="external-variable-catalog">
+          <label>Variables externas del host</label>
+          <span className="hint">Las variables trusted requieren contexto firmado; las de presentación solo pueden controlar bloques informativos.</span>
+          <div className="external-variable-list">
+            {(definition.externalVariables ?? []).map((variable) => (
+              <div className="form-group external-variable-row" key={variable.name}>
+                <div className="external-variable-label">
+                  <label>{variable.label} <code>{variable.name}</code></label>
+                  <input value={variable.label} onChange={(event) => setDefinition(updateExternalVariable(definition, variable.name, { label: event.target.value }))} />
+                </div>
+                <div className="external-variable-control">
+                  <label>Tipo</label>
+                  <select value={variable.type} onChange={(event) => setDefinition(updateExternalVariable(definition, variable.name, { type: event.target.value as 'string' | 'number' | 'boolean' }))}>
+                    <option value="string">Texto</option><option value="number">Número</option><option value="boolean">Booleano</option>
+                  </select>
+                </div>
+                <div className="external-variable-control">
+                  <label>Confianza</label>
+                  <select value={variable.trust} onChange={(event) => setDefinition(updateExternalVariable(definition, variable.name, { trust: event.target.value as 'trusted' | 'presentation' }))}>
+                    <option value="presentation">Presentación</option><option value="trusted">Trusted (firmada)</option>
+                  </select>
+                </div>
+                <button type="button" className="button sm danger external-variable-remove" onClick={() => setDefinition(removeExternalVariable(definition, variable.name))}>Quitar</button>
+              </div>
+            ))}
+          </div>
+          <button type="button" className="button sm secondary external-variable-add" onClick={() => setDefinition(addExternalVariable(definition))}>+ Agregar variable externa</button>
         </div>
       </div>
 
@@ -86,6 +140,18 @@ export function DefinitionEditor({ definition, editorErrors, setDefinition }: De
               {editorErrors.containers[container.id]?.title && (
                 <span className="field-error">{editorErrors.containers[container.id]?.title}</span>
               )}
+            </div>
+            <div className="form-group full">
+              <label>Condiciones de la sección</label>
+              <div className="checkbox-row">
+                {(['visible', 'enabled', 'included'] as const).map((key) => (
+                  <label key={key}><input type="checkbox" checked={Boolean(container.conditions?.[key])} onChange={(event) => setDefinition(updateContainer(definition, container.id, (current) => setContainerCondition(current, key, toggleElementCondition(current.conditions?.[key], event.target.checked, conditionFields.filter((candidate) => !containerFields(container).some((field) => field.id === candidate.id))))))} />{key === 'visible' ? 'Visibilidad' : key === 'enabled' ? 'Habilitación' : 'Inclusión'}</label>
+                ))}
+              </div>
+              {(['visible', 'enabled', 'included'] as const).map((key) => container.conditions?.[key] && (
+                <ConditionEditor key={key} label={key === 'visible' ? 'Visibilidad de la sección' : key === 'enabled' ? 'Habilitación de la sección' : 'Inclusión de la sección'} condition={container.conditions[key]} otherFields={conditionFields.filter((candidate) => !containerFields(container).some((field) => field.id === candidate.id))} externalVariables={definition.externalVariables} onChange={(value) => setDefinition(updateContainer(definition, container.id, (current) => setContainerCondition(current, key, value)))} />
+              ))}
+              {editorErrors.containers[container.id]?.conditions && <span className="field-error">{editorErrors.containers[container.id]?.conditions}</span>}
             </div>
             {container.kind === 'repeater' && (
               <>
@@ -145,16 +211,26 @@ export function DefinitionEditor({ definition, editorErrors, setDefinition }: De
           )}
 
           <div style={{ marginTop: 14 }}>
-            {container.fields.map((field, fieldIndex) => (
+            {(container.items ?? container.fields.map((field) => ({ kind: 'field' as const, field }))).map((item, itemIndex) => item.kind === 'field' ? (
               <FieldEditor
-                key={field.id}
-                field={field}
-                index={fieldIndex}
+                key={item.field.id}
+                field={item.field}
+                index={itemIndex}
                 definition={definition}
                 repeater={container.kind === 'repeater'}
-                fieldErrors={editorErrors.fields[field.id]}
+                fieldErrors={editorErrors.fields[item.field.id]}
                 setDefinition={setDefinition}
               />
+            ) : (
+              <div className="field-editor" key={item.id}>
+                <div className="field-head"><span className="field-badge-type">Bloque informativo</span><button type="button" className="button sm danger" onClick={() => setDefinition(removeTextBlock(definition, item.id))}>Eliminar</button></div>
+                <div className="form-grid">
+                  <div className="form-group"><label>Título</label><input value={item.title ?? ''} onChange={(event) => setDefinition(updateTextBlock(definition, item.id, (current) => ({ ...current, title: event.target.value })))} /></div>
+                  <div className="form-group full"><label>Texto</label><textarea value={item.text} onChange={(event) => setDefinition(updateTextBlock(definition, item.id, (current) => ({ ...current, text: event.target.value })))} /></div>
+                  <div className="form-group full"><label className="checkbox-row"><input type="checkbox" checked={Boolean(item.conditions?.visible)} onChange={(event) => setDefinition(updateTextBlock(definition, item.id, (current) => ({ ...current, conditions: event.target.checked ? { visible: current.conditions?.visible ?? toggleElementCondition(undefined, true)! } : undefined })))} /> Visibilidad condicional</label></div>
+                </div>
+                {item.conditions?.visible && <ConditionEditor label="Visibilidad del bloque" condition={item.conditions.visible} otherFields={conditionFields} externalVariables={definition.externalVariables} onChange={(value) => setDefinition(updateTextBlock(definition, item.id, (current) => ({ ...current, conditions: { visible: value } })))} />}
+              </div>
             ))}
           </div>
 
@@ -170,6 +246,9 @@ export function DefinitionEditor({ definition, editorErrors, setDefinition }: De
             </svg>
             Agregar Campo a este Contenedor
           </button>
+          {container.kind !== 'repeater' && (
+            <button type="button" className="button ghost" style={{ marginTop: 8, width: '100%' }} onClick={() => setDefinition(addTextBlock(definition, container.id))}>+ Agregar bloque informativo</button>
+          )}
         </div>
       ))}
 
