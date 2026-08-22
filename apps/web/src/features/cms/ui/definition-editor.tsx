@@ -178,6 +178,7 @@ export function DefinitionEditor({ definition, editorErrors, setDefinition }: De
           <div className="empty-state-icon">📦</div>
           <h3>Este formulario no tiene contenedores aún</h3>
           <p className="hint">Agregá un contenedor para comenzar a añadir campos y dar formato a tu trámite.</p>
+          {editorErrors.structure && <span className="field-error">{editorErrors.structure}</span>}
           <button
             className="button primary"
             onClick={() => setDefinition(addContainer(definition))}

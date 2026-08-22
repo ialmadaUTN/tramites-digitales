@@ -1,10 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { flattenFields, formDefinitionSchema, FormDefinition, RuntimeFormResponse, validateDefinition } from '@tramites/form-contracts';
+import { flattenFields, formDefinitionSchema, FormDefinition, publishableFormDefinitionSchema, RuntimeFormResponse, validateDefinition } from '@tramites/form-contracts';
+import { assertFormAvailable } from './form-availability';
 import { badRequest, conflict, notFound } from './http-error';
 import { SupabaseService } from './supabase.service';
 import { TipificationRegistry } from './tipification.registry';
 
-type FormRow = { id: number; public_id: string; name: string; draft_definition: unknown; published_version_id: number | null; created_at: string; updated_at: string };
+type FormRow = { id: number; public_id: string; name: string; draft_definition: unknown; published_version_id: number | null; paused_at: string | null; created_at: string; updated_at: string };
 type VersionRow = { id: number; form_id: number; version_number: number; definition: unknown; created_at: string };
 
 @Injectable()
@@ -43,6 +44,8 @@ export class FormsService {
   async publish(publicId: string) {
     const form = await this.findForm(publicId);
     const definition = this.parseDefinition(form.draft_definition);
+    // Los borradores incompletos se guardan; lo que no se puede es publicarlos.
+    this.assertPublishable(definition);
     if (flattenFields(definition).some((field) => field.type === 'fileUpload') && (
       process.env.FORM_UPLOADS_ENABLED !== 'true'
       || process.env.FORM_UPLOADS_AUTHENTICATED !== 'true'
@@ -71,6 +74,32 @@ export class FormsService {
     return { formId: form.public_id, version: versionNumber, definition };
   }
 
+  async pause(publicId: string) {
+    const form = await this.findForm(publicId);
+    if (form.paused_at) return this.toSummary(form);
+    return this.setPaused(publicId, new Date().toISOString());
+  }
+
+  async resume(publicId: string) {
+    const form = await this.findForm(publicId);
+    if (!form.paused_at) return this.toSummary(form);
+    return this.setPaused(publicId, null);
+  }
+
+  /**
+   * Punto único de control de disponibilidad. Lo llama runtime() y, a través de él,
+   * las submissions y los uploads: los tres caminos de runtime pasan por acá.
+   */
+  assertAvailable(form: FormRow): void {
+    assertFormAvailable(form);
+  }
+
+  private async setPaused(publicId: string, pausedAt: string | null) {
+    const { data, error } = await this.supabase.db.from('forms').update({ paused_at: pausedAt, updated_at: new Date().toISOString() }).eq('public_id', publicId).select('*').single();
+    if (error || !data) throw new Error(error?.message ?? 'No se pudo cambiar la disponibilidad del formulario');
+    return this.toSummary(data);
+  }
+
   async versions(publicId: string) {
     const form = await this.findForm(publicId);
     const { data, error } = await this.supabase.db.from('form_versions').select('id, form_id, version_number, definition, created_at').eq('form_id', form.id).order('version_number', { ascending: false });
@@ -80,7 +109,9 @@ export class FormsService {
 
   async runtime(publicId: string, mode: 'published' | 'draft' = 'published'): Promise<RuntimeFormResponse> {
     const form = await this.findForm(publicId);
+    // La preview del CMS pide 'draft' y tiene que seguir funcionando: se pausa un formulario justamente para poder arreglarlo.
     if (mode === 'draft') return { formId: form.public_id, version: null, definition: this.parseDefinition(form.draft_definition), source: 'draft' };
+    this.assertAvailable(form);
     if (!form.published_version_id) notFound('El formulario todavía no tiene una versión publicada');
     const { data, error } = await this.supabase.db.from('form_versions').select('*').eq('id', form.published_version_id).single();
     if (error || !data) throw new Error(error?.message ?? 'No se encontró la versión publicada');
@@ -94,6 +125,16 @@ export class FormsService {
     return data;
   }
 
+  /**
+   * Completitud estructural. Va aparte de `parseDefinition` porque ese se usa
+   * también para leer: si rechazara definiciones incompletas, un borrador vacío
+   * ya guardado rompería el listado del CMS entero.
+   */
+  private assertPublishable(definition: FormDefinition): void {
+    const result = publishableFormDefinitionSchema.safeParse(definition);
+    if (!result.success) badRequest('La definición no está completa para publicar', result.error.flatten());
+  }
+
   private parseDefinition(value: unknown): FormDefinition {
     const result = formDefinitionSchema.safeParse(value);
     if (!result.success) badRequest('La definición del formulario no es válida', result.error.flatten());
@@ -102,6 +143,6 @@ export class FormsService {
 
   private toSummary(form: FormRow) {
     const definition = this.parseDefinition(form.draft_definition);
-    return { id: form.public_id, name: form.name, title: definition.title, published: Boolean(form.published_version_id), updatedAt: form.updated_at };
+    return { id: form.public_id, name: form.name, title: definition.title, published: Boolean(form.published_version_id), paused: Boolean(form.paused_at), pausedAt: form.paused_at, updatedAt: form.updated_at };
   }
 }

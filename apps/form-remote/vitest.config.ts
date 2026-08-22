@@ -7,9 +7,9 @@ export default defineConfig({
     include: ['src/**/*.test.{ts,tsx}'],
     coverage: coverage(
       // Piso = lo ya alcanzado (ratchet): impide retroceder sin fingir una
-      // meta. El hueco grande es `use-runtime-form` + `dynamic-field` +
-      // `dynamic-repeater`, que es la próxima tanda de tests de interacción.
-      { statements: 26, branches: 18, functions: 30, lines: 26 },
+      // meta. `use-runtime-form` ya tiene tests (carga, pausa y error de
+      // envío); lo que sigue abierto es `dynamic-field` + `dynamic-repeater`.
+      { statements: 47, branches: 30, functions: 46, lines: 49 },
       [
         // Adaptadores de red y de Supabase: sin lógica propia, se verifican en
         // los e2e contra los servicios reales.

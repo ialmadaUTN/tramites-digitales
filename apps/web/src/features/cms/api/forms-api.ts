@@ -7,6 +7,9 @@ export type FormSummary = {
   name: string;
   title: string;
   published: boolean;
+  /** Un formulario pausado no entrega su definición publicada ni acepta submissions nuevas. */
+  paused: boolean;
+  pausedAt: string | null;
   updatedAt: string;
 };
 
@@ -22,6 +25,8 @@ export interface FormsApi {
   create(name: string, definition: FormDefinition): Promise<FormSummary>;
   saveDraft(formId: string, name: string, definition: FormDefinition): Promise<void>;
   publish(formId: string): Promise<void>;
+  pause(formId: string): Promise<void>;
+  resume(formId: string): Promise<void>;
 }
 
 export function createFormsApi(baseUrl = bffUrl): FormsApi {
@@ -55,6 +60,14 @@ export function createFormsApi(baseUrl = bffUrl): FormsApi {
     async publish(formId) {
       const response = await fetch(`${baseUrl}/forms/${formId}/publish`, { method: 'POST' });
       await ensureOk(response, 'No se pudo publicar');
+    },
+    async pause(formId) {
+      const response = await fetch(`${baseUrl}/forms/${formId}/pause`, { method: 'POST' });
+      await ensureOk(response, 'No se pudo pausar');
+    },
+    async resume(formId) {
+      const response = await fetch(`${baseUrl}/forms/${formId}/resume`, { method: 'POST' });
+      await ensureOk(response, 'No se pudo reactivar');
     },
   };
 }

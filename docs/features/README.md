@@ -23,6 +23,7 @@ La regla completa está en [`AGENTS.md`](../../AGENTS.md) en la raíz del reposi
 | [Campos de solo lectura](campos-de-solo-lectura.md) | Campos visibles pero no editables, y cómo se garantiza su valor del lado del servidor. |
 | [Lógica condicional](logica-condicional.md) | Visibilidad, habilitación y obligatoriedad condicionales entre campos. |
 | [Grillas repetibles](grillas-repetibles.md) | Contenedores de filas repetibles y sus columnas. |
+| [Pausa de formularios](pausa-de-formularios.md) | Sacar de circulación un formulario publicado y reactivarlo: qué se bloquea, con qué código HTTP y cómo se comporta ante caché, reintentos y sesiones abiertas. |
 
 ## Qué no va acá
 

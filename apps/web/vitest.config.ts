@@ -11,10 +11,10 @@ export default defineConfig({
       {
         // Lógica del editor: pura, barata de testear y es la que decide si un
         // formulario se puede guardar. Misma barra que el contrato.
-        'src/features/cms/model/**': { statements: 90, branches: 85, functions: 95, lines: 93 },
+        'src/features/cms/model/**': { statements: 92, branches: 85, functions: 98, lines: 93 },
         // UI del editor: se cubre con tests de interacción sobre la definición
         // que produce, no línea por línea. El piso es lo ya alcanzado.
-        'src/features/cms/ui/**': { statements: 48, branches: 62, functions: 42, lines: 52 },
+        'src/features/cms/ui/**': { statements: 50, branches: 64, functions: 43, lines: 53 },
         // Piso global. `hooks/use-cms-workspace.ts` está en 0 % y es la próxima
         // deuda a saldar: no se excluye justamente para que siga a la vista.
         statements: 65,

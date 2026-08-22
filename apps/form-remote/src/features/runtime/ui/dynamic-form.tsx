@@ -9,9 +9,11 @@ export function DynamicForm(props: DynamicFormProps) {
   const runtime = useRuntimeForm(props);
 
   if (runtime.loadError) {
+    // Un formulario pausado no es una falla: se muestra el mensaje del BFF sin el encabezado de error.
+    const paused = runtime.loadError.code === 'FORM_PAUSED';
     return (
-      <FormState title="No se pudo cargar" variant="error">
-        <span>{runtime.loadError}</span>
+      <FormState title={paused ? 'Formulario no disponible' : 'No se pudo cargar'} variant="error">
+        <span>{runtime.loadError.message}</span>
       </FormState>
     );
   }

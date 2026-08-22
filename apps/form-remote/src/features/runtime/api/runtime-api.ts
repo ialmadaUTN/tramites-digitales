@@ -16,11 +16,21 @@ export interface RuntimeApi {
   completeUpload(formId: string, uploadId: string, uploadSession: string): Promise<UploadReference>;
 }
 
+/**
+ * El BFF responde los errores como `{ code, message }`. Tirar `response.text()` crudo
+ * dejaba el JSON entero en pantalla; lo que se muestra tiene que ser el `message`,
+ * y el `code` viaja aparte para que la UI pueda distinguir casos como FORM_PAUSED.
+ */
+export async function toApiError(response: Response, fallback: string): Promise<Error & { code?: string }> {
+  const body = (await response.json().catch(() => undefined)) as { code?: string; message?: string } | undefined;
+  return Object.assign(new Error(body?.message ?? fallback), { code: body?.code, details: body });
+}
+
 export function createRuntimeApi(apiBaseUrl: string): RuntimeApi {
   return {
     async loadForm(formId, mode) {
       const response = await fetch(joinUrl(apiBaseUrl, `runtime/forms/${formId}?mode=${mode}`));
-      if (!response.ok) throw new Error(await response.text());
+      if (!response.ok) throw await toApiError(response, 'No se pudo cargar el formulario');
       return response.json() as Promise<RuntimeFormResponse>;
     },
     async submit(formId, input, uploadSession) {
@@ -29,11 +39,8 @@ export function createRuntimeApi(apiBaseUrl: string): RuntimeApi {
         headers: { 'content-type': 'application/json', 'Idempotency-Key': crypto.randomUUID(), 'X-Upload-Session': uploadSession },
         body: JSON.stringify(input),
       });
-      const body = await response.json().catch(() => undefined);
-      if (!response.ok) {
-        throw Object.assign(new Error((body as { message?: string } | undefined)?.message ?? 'No se pudo enviar el formulario'), { details: body });
-      }
-      return body as SubmissionReceipt;
+      if (!response.ok) throw await toApiError(response, 'No se pudo enviar el formulario');
+      return (await response.json()) as SubmissionReceipt;
     },
     async createUpload(formId, input, uploadSession) {
       const response = await fetch(joinUrl(apiBaseUrl, `runtime/forms/${formId}/uploads`), {
@@ -41,7 +48,7 @@ export function createRuntimeApi(apiBaseUrl: string): RuntimeApi {
         headers: { 'content-type': 'application/json', 'X-Upload-Session': uploadSession },
         body: JSON.stringify(input),
       });
-      if (!response.ok) throw new Error(await response.text());
+      if (!response.ok) throw await toApiError(response, 'No se pudo completar la operación');
       return response.json() as Promise<UploadTicket>;
     },
     async completeUpload(formId, uploadId, uploadSession) {
@@ -49,7 +56,7 @@ export function createRuntimeApi(apiBaseUrl: string): RuntimeApi {
         method: 'POST',
         headers: { 'X-Upload-Session': uploadSession },
       });
-      if (!response.ok) throw new Error(await response.text());
+      if (!response.ok) throw await toApiError(response, 'No se pudo completar la operación');
       return response.json() as Promise<UploadReference>;
     },
   };

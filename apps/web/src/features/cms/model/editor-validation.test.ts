@@ -55,3 +55,75 @@ describe('collectDefinitionEditorErrors', () => {
     expect(errors.hasErrors).toBe(false);
   });
 });
+
+/**
+ * Completitud estructural en el editor. La distinción que importa: estos
+ * problemas **no** bloquean guardar (un borrador es trabajo a medias) pero sí
+ * bloquean publicar.
+ */
+describe('completitud estructural', () => {
+  const ok: FormDefinition = {
+    schemaVersion: 2,
+    tipificationKey: 'generic@v1',
+    title: 'Demo',
+    submitLabel: 'Enviar',
+    containers: [{
+      id: 'c1',
+      title: 'Uno',
+      kind: 'section',
+      columns: 1,
+      fields: [{ id: 'f1', fieldName: 'nombre', type: 'text', label: 'Nombre', width: 'full', rules: {} }],
+    }],
+  };
+
+  it('un formulario completo se puede guardar y publicar', () => {
+    const errors = collectDefinitionEditorErrors(ok, 'Demo');
+    expect(errors.hasErrors).toBe(false);
+    expect(errors.canPublish).toBe(true);
+  });
+
+  it('formulario sin contenedores: se guarda, no se publica', () => {
+    const errors = collectDefinitionEditorErrors({ ...ok, containers: [] }, 'Demo');
+    expect(errors.hasErrors).toBe(false);
+    expect(errors.canPublish).toBe(false);
+    expect(errors.structure).toBe('El formulario debe tener al menos un contenedor');
+  });
+
+  it('contenedor vacío: marca ese contenedor con el mensaje del ticket', () => {
+    const errors = collectDefinitionEditorErrors(
+      { ...ok, containers: [{ ...ok.containers[0]!, fields: [] }] },
+      'Demo',
+    );
+    expect(errors.hasErrors).toBe(false);
+    expect(errors.canPublish).toBe(false);
+    expect(errors.containers.c1?.fields).toBe('El contenedor debe tener al menos un campo');
+  });
+
+  it('grilla sin columnas: habla de columnas, no de campos', () => {
+    const errors = collectDefinitionEditorErrors({
+      ...ok,
+      containers: [{ id: 'r1', title: 'Grilla', kind: 'repeater', fieldName: 'filas', columns: 1, fields: [] }],
+    }, 'Demo');
+    expect(errors.canPublish).toBe(false);
+    expect(errors.containers.r1?.fields).toBe('La grilla necesita al menos una columna');
+  });
+
+  it('marca solo el contenedor vacío y deja limpio al que tiene campos', () => {
+    const errors = collectDefinitionEditorErrors({
+      ...ok,
+      containers: [ok.containers[0]!, { id: 'c2', title: 'Vacía', kind: 'section', columns: 1, fields: [] }],
+    }, 'Demo');
+    expect(errors.containers.c1).toBeUndefined();
+    expect(errors.containers.c2?.fields).toBe('El contenedor debe tener al menos un campo');
+  });
+
+  it('un campo mal definido sí bloquea guardar, además de publicar', () => {
+    // La separación no debe aflojar las validaciones que ya existían.
+    const errors = collectDefinitionEditorErrors({
+      ...ok,
+      containers: [{ ...ok.containers[0]!, fields: [{ id: 'f1', fieldName: '111', type: 'text', label: 'A', width: 'full', rules: {} }] }],
+    }, 'Demo');
+    expect(errors.hasErrors).toBe(true);
+    expect(errors.canPublish).toBe(false);
+  });
+});
