@@ -106,6 +106,8 @@ Por campo se puede configurar:
 
 El catálogo de variables externas se configura por formulario. Cada variable declara tipo (`string`, `number`, `boolean`) y confianza (`presentation` o `trusted`). El editor solo permite usar una variable de presentación en la visibilidad de un bloque informativo; cualquier condición que afecte datos requiere contexto firmado del host. El host de demostración firma ese contexto en el servidor; el secreto se configura como `FORM_CONTEXT_JWT_SECRET` y nunca se expone al navegador.
 
+Los bloques informativos también pueden interpolar esas variables en el título y el contenido con `{{nombre}}`. La referencia debe existir en el catálogo; el renderer recibe el valor desde `DynamicFormProps.externalVariables`, incluso para variables `trusted`, porque el bloque no participa de autorización ni del payload. Si un bloque visible no recibe un valor útil, el renderer muestra un error general y notifica `MISSING_EXTERNAL_VARIABLE`; los bloques ocultos no se resuelven.
+
 La vista previa interactiva incluye el panel **Contexto de prueba** (`apps/web/src/features/cms/ui/preview-context-panel.tsx`). Allí se pueden asignar o quitar valores con controles acordes al tipo, distinguir variables `trusted` de `presentation`, restablecer el contexto y consultar el JSON de props que recibe `DynamicForm`. El renderer informa el estado efectivo (visible, habilitado e incluido) y el payload simulado, por lo que un valor oculto o excluido se ve inmediatamente como ausente. El panel es exclusivamente local: no firma el contexto, no cambia el borrador y no otorga autorización.
 
 ## Validación previa al guardado
@@ -124,7 +126,7 @@ El editor reproduce las reglas del contrato y muestra el error **junto al campo*
 | Solo lectura mal configurado | Ver [Campos de solo lectura](campos-de-solo-lectura.md) |
 | Claves de payload duplicadas o inválidas | Este nombre de clave ya se usa en otro campo |
 | Condiciones incompletas o mal apuntadas | Ver [Lógica condicional](logica-condicional.md) |
-| Variables externas o bloques incompatibles | La variable no está declarada, el tipo no coincide o el bloque se usa dentro de una grilla |
+| Variables externas, plantillas o bloques incompatibles | La variable no está declarada, el placeholder es inválido, el tipo no coincide o el bloque se usa dentro de una grilla |
 | Grilla sin columnas o con filas inconsistentes | Ver [Grillas repetibles](grillas-repetibles.md) |
 
 El BFF revalida todo contra el contrato al guardar: el editor adelanta el diagnóstico, no lo reemplaza.
@@ -154,3 +156,4 @@ El BFF revalida todo contra el contrato al guardar: el editor adelanta el diagn�
 - **2026-08-20** — Se retiró del CMS la acción para crear nuevas grillas repetibles; las grillas existentes siguen siendo editables.
 - **2026-08-21** — Se agregó la autoría v3 de variables externas, condiciones jerárquicas, exclusión independiente y bloques informativos ordenados; los formularios v1/v2 se migran a v3 al abrirse en el CMS sin alterar la versión publicada.
 - **2026-08-21** — La vista previa del CMS incorporó un panel de contexto tipado para probar variables externas y mostrar el estado efectivo y el payload limpio sin enviar esos valores al servidor.
+- **2026-08-21** — Los bloques informativos incorporaron plantillas dinámicas seguras, validación de referencias externas y reordenamiento dentro de la secuencia de campos.

@@ -1,5 +1,65 @@
 import type { FieldType, FormField, FormOption, MaskKind } from './index.js';
 
+const TEMPLATE_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+export type TextTemplateResolution =
+  | { success: true; value: string }
+  | { success: false; missing: string[]; invalid?: string[]; message: string };
+
+/**
+ * Finds the external variable names used by a text template. Double braces
+ * are reserved for placeholders; malformed placeholders are reported so an
+ * author cannot accidentally publish text that will render differently.
+ */
+export function textTemplateVariables(template: string): { variables: string[]; error?: string } {
+  const variables: string[] = [];
+  let cursor = 0;
+  while (cursor < template.length) {
+    const open = template.indexOf('{{', cursor);
+    const closeOutside = template.indexOf('}}', cursor);
+    if (open < 0) {
+      if (closeOutside >= 0) return { variables, error: 'Hay un cierre de variable sin apertura' };
+      break;
+    }
+    if (closeOutside >= 0 && closeOutside < open) return { variables, error: 'Hay un cierre de variable sin apertura' };
+    const close = template.indexOf('}}', open + 2);
+    if (close < 0) return { variables, error: 'La variable queda abierta; cerrala con }}' };
+    const name = template.slice(open + 2, close).trim();
+    if (!TEMPLATE_NAME_PATTERN.test(name)) return { variables, error: `Nombre de variable inválido: ${name || '(vacío)'}` };
+    variables.push(name);
+    cursor = close + 2;
+  }
+  return { variables: [...new Set(variables)] };
+}
+
+/** Validates template syntax and references against the form catalog. */
+export function textTemplateError(template: string, declaredVariables: Iterable<string>): string | undefined {
+  const parsed = textTemplateVariables(template);
+  if (parsed.error) return parsed.error;
+  const declared = new Set(declaredVariables);
+  const missing = parsed.variables.find((name) => !declared.has(name));
+  return missing ? `La plantilla usa una variable externa no declarada: ${missing}` : undefined;
+}
+
+/** Resolves a template using only scalar values supplied by the host. */
+export function resolveTextTemplate(template: string, values: Record<string, unknown>): TextTemplateResolution {
+  const parsed = textTemplateVariables(template);
+  if (parsed.error) return { success: false, missing: [], message: parsed.error };
+  const missing = parsed.variables.filter((name) => {
+    const value = values[name];
+    return value === undefined || value === null || (typeof value === 'string' && value.trim() === '')
+      || !['string', 'number', 'boolean'].includes(typeof value);
+  });
+  if (missing.length > 0) {
+    return { success: false, missing, message: `Faltan variables externas: ${missing.join(', ')}` };
+  }
+  let value = template;
+  for (const name of parsed.variables) {
+    value = value.replace(new RegExp(`{{\\s*${name}\\s*}}`, 'g'), String(values[name]));
+  }
+  return { success: true, value };
+}
+
 /** Ordered field/block projection shared by the CMS without loading the barrel. */
 export function containerItems<T, I extends { kind: string }>(container: { fields: T[]; items?: I[] }): Array<I | { kind: 'field'; field: T }> {
   return container.items ?? container.fields.map((field) => ({ kind: 'field' as const, field }));

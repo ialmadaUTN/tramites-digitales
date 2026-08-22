@@ -38,6 +38,7 @@ import {
   MULTI_VALUE_FIELD_TYPES,
   READ_ONLY_UNSUPPORTED_FIELD_TYPES,
   REPEATER_FIELD_TYPES,
+  textTemplateError,
   TEXT_LENGTH_FIELD_TYPES,
   containerFields,
   containerItems,
@@ -242,7 +243,7 @@ export const textBlockSchema = z.object({
   id: z.string().min(1),
   kind: z.literal('textBlock'),
   title: z.string().optional(),
-  text: z.string().min(1),
+  text: z.string().min(1).refine((value) => value.trim().length > 0, 'El contenido del bloque no puede estar vacío'),
   conditions: z.object({ visible: conditionGroupSchema.optional() }).strict().optional(),
 });
 export type TextBlock = z.infer<typeof textBlockSchema>;
@@ -493,6 +494,12 @@ export const formDefinitionSchema = z
       for (const [itemIndex, item] of containerItems(container).entries()) {
         if (item.kind === 'textBlock') {
           if (!isV3) ctx.addIssue({ code: 'custom', path: ['containers', containerIndex, 'items', itemIndex], message: 'Los bloques informativos requieren schemaVersion 3' });
+          for (const [key, value] of [['title', item.title], ['text', item.text]] as const) {
+            if (value !== undefined) {
+              const templateError = textTemplateError(value, externalByName.keys());
+              if (templateError) ctx.addIssue({ code: 'custom', path: ['containers', containerIndex, 'items', itemIndex, key], message: templateError });
+            }
+          }
           validateConditionGroups(item.conditions ?? {}, ['containers', containerIndex, 'items', itemIndex, 'conditions'], 'textBlock');
         }
       }

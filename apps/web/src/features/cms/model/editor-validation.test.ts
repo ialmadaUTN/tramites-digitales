@@ -132,6 +132,10 @@ describe('collectDefinitionEditorErrors', () => {
       ] }],
     };
     expect(collectDefinitionEditorErrors(blockDefinition, 'Form').hasErrors).toBe(false);
+    const dynamicBlock = { ...blockDefinition, externalVariables: [{ name: 'customerName', label: 'Cliente', type: 'string' as const, trust: 'trusted' as const }], containers: [{ ...blockDefinition.containers[0]!, items: [{ kind: 'textBlock' as const, id: 'dynamic', title: 'Nombre: {{customerName}}', text: 'Valor: {{customerName}}' }] }] };
+    expect(collectDefinitionEditorErrors(dynamicBlock, 'Form').hasErrors).toBe(false);
+    const invalidTemplate = { ...dynamicBlock, containers: [{ ...dynamicBlock.containers[0]!, items: [{ kind: 'textBlock' as const, id: 'dynamic', title: 'Nombre: {{missing}}', text: 'Valor' }] }] };
+    expect(collectDefinitionEditorErrors(invalidTemplate, 'Form').textBlocks.dynamic?.title).toMatch(/no declarada/);
     const invalidBlock = { ...blockDefinition, containers: [{ ...blockDefinition.containers[0]!, items: [{ kind: 'textBlock' as const, id: 'bad', text: 'Ayuda', conditions: { visible: { logic: 'all' as const, rules: [{ source: { kind: 'external' as const, variable: 'missing' }, operator: 'equals' as const, value: 'x' }] } } }] }] };
     expect(collectDefinitionEditorErrors(invalidBlock, 'Form').containers.c1?.conditions).toMatch(/variable externa/);
   });

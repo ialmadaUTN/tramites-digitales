@@ -1,5 +1,5 @@
-import { isElementEnabled, isElementIncluded, isElementVisible, type DynamicFormProps, type FormItem } from '@tramites/form-contracts';
-import { useEffect, useMemo } from 'react';
+import { isElementEnabled, isElementIncluded, isElementVisible, resolveTextTemplate, type DynamicFormProps, type FormDefinition, type FormItem, type FormRuntimeError } from '@tramites/form-contracts';
+import { useEffect, useMemo, useRef } from 'react';
 import { useRuntimeForm } from '../hooks/use-runtime-form';
 import { DynamicField } from './fields/dynamic-field';
 import { FormState } from './form-state';
@@ -7,6 +7,39 @@ import { DynamicRepeater } from './repeater/dynamic-repeater';
 import '../../../styles.css';
 import { valuesByFieldId } from '../model/field-state';
 import { evaluatePreviewState } from '../model/preview-state';
+
+type RenderedTextBlock = { title?: string; text: string };
+type TextTemplateState = { rendered: Map<string, RenderedTextBlock>; error?: FormRuntimeError };
+
+function resolveVisibleTextBlocks(definition: FormDefinition, conditionValues: Record<string, unknown>, externalVariables: Record<string, unknown>): TextTemplateState {
+  const rendered = new Map<string, RenderedTextBlock>();
+  const missing = new Set<string>();
+  const invalid = new Set<string>();
+
+  for (const container of definition.containers) {
+    if (!isElementVisible(container.conditions, conditionValues, externalVariables)) continue;
+    for (const item of container.items ?? container.fields.map((field) => ({ kind: 'field' as const, field }))) {
+      if (item.kind !== 'textBlock' || (item.conditions?.visible && !isElementVisible(item.conditions, conditionValues, externalVariables))) continue;
+      const title = item.title === undefined ? { success: true as const, value: undefined } : resolveTextTemplate(item.title, externalVariables);
+      const text = resolveTextTemplate(item.text, externalVariables);
+      if (!title.success) {
+        title.missing.forEach((name) => missing.add(name));
+        if (title.missing.length === 0) invalid.add(title.message);
+      }
+      if (!text.success) {
+        text.missing.forEach((name) => missing.add(name));
+        if (text.missing.length === 0) invalid.add(text.message);
+      }
+      if (title.success && text.success) rendered.set(item.id, { title: title.value, text: text.value });
+    }
+  }
+
+  if (missing.size > 0 || invalid.size > 0) {
+    const message = missing.size > 0 ? `Faltan variables externas: ${[...missing].join(', ')}` : [...invalid].join('; ');
+    return { rendered, error: { code: 'MISSING_EXTERNAL_VARIABLE', message } };
+  }
+  return { rendered };
+}
 
 export function DynamicForm(props: DynamicFormProps) {
   const runtime = useRuntimeForm(props);
@@ -16,10 +49,28 @@ export function DynamicForm(props: DynamicFormProps) {
       : undefined,
     [runtime.definition, runtime.values, runtime.externalVariables],
   );
+  const conditionValues = useMemo(
+    () => runtime.definition ? valuesByFieldId(runtime.fieldMap, runtime.values) : {},
+    [runtime.definition, runtime.fieldMap, runtime.values],
+  );
+  const textTemplateState = useMemo(
+    () => runtime.definition && previewState?.visible
+      ? resolveVisibleTextBlocks(runtime.definition, conditionValues, runtime.externalVariables)
+      : { rendered: new Map<string, RenderedTextBlock>() },
+    [runtime.definition, runtime.externalVariables, conditionValues, previewState?.visible],
+  );
+  const lastTemplateError = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     if (previewState) props.onPreviewStateChange?.(previewState);
   }, [previewState, props.onPreviewStateChange]);
+
+  useEffect(() => {
+    const error = textTemplateState.error;
+    const signature = error ? `${error.code}:${error.message}` : undefined;
+    if (error && signature && signature !== lastTemplateError.current) props.onError?.(error);
+    lastTemplateError.current = signature;
+  }, [props.onError, textTemplateState.error]);
 
   if (runtime.loadError) {
     return (
@@ -38,9 +89,15 @@ export function DynamicForm(props: DynamicFormProps) {
     );
   }
 
-  const conditionValues = valuesByFieldId(runtime.fieldMap, runtime.values);
   if (!previewState?.visible) {
     return <FormState>Este formulario no está disponible para el contexto actual.</FormState>;
+  }
+  if (textTemplateState.error) {
+    return (
+      <FormState title="No se pudo mostrar" variant="error">
+        <span>{textTemplateState.error.message}</span>
+      </FormState>
+    );
   }
   const formEnabled = previewState.enabled;
 
@@ -60,8 +117,8 @@ export function DynamicForm(props: DynamicFormProps) {
     />
   ) : (!item.conditions?.visible || isElementVisible(item.conditions, conditionValues, runtime.externalVariables)) ? (
     <aside className="form-info-block" key={item.id}>
-      {item.title && <h3>{item.title}</h3>}
-      <p>{item.text}</p>
+      {textTemplateState.rendered.get(item.id)?.title && <h3>{textTemplateState.rendered.get(item.id)?.title}</h3>}
+      <p>{textTemplateState.rendered.get(item.id)?.text ?? item.text}</p>
     </aside>
   ) : null;
 

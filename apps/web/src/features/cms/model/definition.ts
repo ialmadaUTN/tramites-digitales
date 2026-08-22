@@ -1,5 +1,5 @@
 import type { ConditionGroup, ConditionRule, ConditionSource, FieldType, FormContainer, FormDefinition, FormField, FormOption, TextBlock } from '@tramites/form-contracts';
-import { containerFields } from '@tramites/form-contracts/field-rules';
+import { containerFields, textTemplateError } from '@tramites/form-contracts/field-rules';
 import { defaultValuesOutsideCatalog, isMaskCompatible } from '@tramites/form-contracts/field-rules';
 import {
   LENGTH_RULE_FIELD_TYPES,
@@ -51,15 +51,22 @@ export function moveContainer(definition: FormDefinition, containerId: string, o
 }
 
 export function moveField(definition: FormDefinition, fieldId: string, offset: -1 | 1): FormDefinition {
+  return moveContainerItem(definition, fieldId, offset);
+}
+
+export function moveContainerItem(definition: FormDefinition, itemId: string, offset: -1 | 1): FormDefinition {
   return {
     ...definition,
     containers: definition.containers.map((container) => {
-      const index = container.fields.findIndex((field) => field.id === fieldId);
-      const fields = moveItem(container.fields, index, offset);
-      if (!fields) return container;
-      const itemIndex = container.items?.findIndex((item) => item.kind === 'field' && item.field.id === fieldId) ?? -1;
-      const items = container.items && itemIndex >= 0 ? moveItem(container.items, itemIndex, offset) ?? container.items : container.items;
-      return { ...container, fields, items };
+      const currentItems = container.items ?? container.fields.map((field) => ({ kind: 'field' as const, field }));
+      const index = currentItems.findIndex((item) => item.kind === 'field' ? item.field.id === itemId : item.id === itemId);
+      const items = moveItem(currentItems, index, offset);
+      if (!items) return container;
+      return {
+        ...container,
+        items,
+        fields: items.filter((item): item is { kind: 'field'; field: FormField } => item.kind === 'field').map((item) => item.field),
+      };
     }),
   };
 }
@@ -304,6 +311,13 @@ export function removeTextBlock(definition: FormDefinition, blockId: string): Fo
     ...definition,
     containers: definition.containers.map((container) => ({ ...container, items: container.items?.filter((item) => item.kind !== 'textBlock' || item.id !== blockId) })),
   };
+}
+
+export function textBlockTemplateError(block: TextBlock, externalVariableNames: Iterable<string>): { title?: string; text?: string } {
+  const errors: { title?: string; text?: string } = {};
+  if (block.title !== undefined) errors.title = textTemplateError(block.title, externalVariableNames);
+  errors.text = !block.text.trim() ? 'El contenido es obligatorio' : textTemplateError(block.text, externalVariableNames);
+  return Object.fromEntries(Object.entries(errors).filter(([, value]) => value)) as { title?: string; text?: string };
 }
 
 export function toggleFieldCondition(field: FormField, key: ConditionKey, enabled: boolean, fallback: string | ConditionSource): FormField {

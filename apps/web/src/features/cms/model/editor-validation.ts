@@ -9,6 +9,7 @@ import {
   READ_ONLY_BLOCKED_FIELD_TYPES,
   REPEATER_FIELD_TYPES,
 } from './constants';
+import { textBlockTemplateError } from './definition';
 
 export type FieldEditorErrors = {
   fieldName?: string;
@@ -33,6 +34,11 @@ export type ContainerEditorErrors = {
   conditions?: string;
 };
 
+export type TextBlockEditorErrors = {
+  title?: string;
+  text?: string;
+};
+
 export type DefinitionEditorErrors = {
   name?: string;
   title?: string;
@@ -41,6 +47,7 @@ export type DefinitionEditorErrors = {
   conditions?: string;
   containers: Record<string, ContainerEditorErrors>;
   fields: Record<string, FieldEditorErrors>;
+  textBlocks: Record<string, TextBlockEditorErrors>;
   hasErrors: boolean;
 };
 
@@ -273,6 +280,7 @@ function containerErrorsFor(container: FormContainer): ContainerEditorErrors {
 export function collectDefinitionEditorErrors(definition: FormDefinition, name?: string): DefinitionEditorErrors {
   const containers: Record<string, ContainerEditorErrors> = {};
   const fields: Record<string, FieldEditorErrors> = {};
+  const textBlocks: Record<string, TextBlockEditorErrors> = {};
   /** Claves de payload de primer nivel: campos sueltos y grillas comparten espacio. */
   const rootNames = new Map<string, string>();
   const candidateIds = new Set(
@@ -341,6 +349,8 @@ export function collectDefinitionEditorErrors(definition: FormDefinition, name?:
 
     for (const item of container.items ?? []) {
       if (item.kind !== 'textBlock') continue;
+      const templateErrors = textBlockTemplateError(item, (definition.externalVariables ?? []).map((variable) => variable.name));
+      if (Object.keys(templateErrors).length > 0) textBlocks[item.id] = templateErrors;
       const textBlockError = textBlockConditionError(item.conditions?.visible, candidateIds, definition.externalVariables ?? []);
       if (textBlockError) containers[container.id] = { ...containers[container.id], conditions: textBlockError };
     }
@@ -360,8 +370,9 @@ export function collectDefinitionEditorErrors(definition: FormDefinition, name?:
     conditions: formConditionError,
     containers,
     fields,
+    textBlocks,
     hasErrors: Boolean(
-      nameError || titleError || submitLabelError || tipificationKeyError || formConditionError || Object.keys(containers).length || Object.keys(fields).length,
+      nameError || titleError || submitLabelError || tipificationKeyError || formConditionError || Object.keys(containers).length || Object.keys(fields).length || Object.keys(textBlocks).length,
     ),
   };
 }
