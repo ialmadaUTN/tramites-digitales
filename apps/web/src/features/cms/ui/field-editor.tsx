@@ -138,8 +138,11 @@ function DefaultValueControl({ field, onChange }: { field: FormField; onChange: 
 export function FieldEditor({ field, index, definition, fieldErrors, repeater = false, setDefinition }: FieldEditorProps) {
   const change = (update: (current: FormField) => FormField) => setDefinition(updateField(definition, field.id, update));
   const candidates = otherFields(definition, field.id);
+  const fallbackConditionSource = candidates[0]
+    ? { kind: 'field' as const, fieldId: candidates[0].id }
+    : (definition.externalVariables?.[0] ? { kind: 'external' as const, variable: definition.externalVariables[0].name } : undefined);
   const toggleCondition = (key: ConditionKey, enabled: boolean) =>
-    change((current) => toggleFieldCondition(current, key, enabled, candidates[0]?.id ?? ''));
+    change((current) => enabled && !fallbackConditionSource ? current : toggleFieldCondition(current, key, enabled, fallbackConditionSource ?? ''));
 
   const acceptsLengthRules = LENGTH_RULE_FIELD_TYPES.includes(field.type);
   const acceptsMask = MASK_FIELD_TYPES.includes(field.type);
@@ -156,7 +159,7 @@ export function FieldEditor({ field, index, definition, fieldErrors, repeater = 
           <span className="field-type-tag">{TYPE_LABELS[field.type] || field.type}</span>
           {field.rules.required && <span className="badge badge-warning">Obligatorio</span>}
           {field.readOnly && <span className="badge badge-info">Solo lectura</span>}
-          {(field.conditions?.visible || field.conditions?.enabled || field.conditions?.required) && (
+          {(field.conditions?.visible || field.conditions?.enabled || field.conditions?.included || field.conditions?.required) && (
             <span className="badge badge-info">Condicional</span>
           )}
         </div>
@@ -564,6 +567,14 @@ export function FieldEditor({ field, index, definition, fieldErrors, repeater = 
             <label>
               <input
                 type="checkbox"
+                checked={Boolean(field.conditions?.included)}
+                onChange={(event) => toggleCondition('included', event.target.checked)}
+              />
+              Inclusión condicional
+            </label>
+            <label>
+              <input
+                type="checkbox"
                 checked={Boolean(field.conditions?.required)}
                 onChange={(event) => toggleCondition('required', event.target.checked)}
               />
@@ -577,12 +588,13 @@ export function FieldEditor({ field, index, definition, fieldErrors, repeater = 
         <span className="hint">Las celdas de una grilla no admiten lógica condicional.</span>
       )}
 
-      {!repeater && candidates.length > 0 && (
+      {!repeater && (candidates.length > 0 || (definition.externalVariables?.length ?? 0) > 0) && (
         <>
           <ConditionEditor
             label="Visibilidad"
             condition={field.conditions?.visible}
             otherFields={candidates}
+            externalVariables={definition.externalVariables}
             error={fieldErrors?.conditions}
             onChange={(value) => change((current) => setFieldCondition(current, 'visible', value))}
           />
@@ -590,13 +602,23 @@ export function FieldEditor({ field, index, definition, fieldErrors, repeater = 
             label="Habilitación"
             condition={field.conditions?.enabled}
             otherFields={candidates}
+            externalVariables={definition.externalVariables}
             error={fieldErrors?.conditions}
             onChange={(value) => change((current) => setFieldCondition(current, 'enabled', value))}
+          />
+          <ConditionEditor
+            label="Inclusión en el payload"
+            condition={field.conditions?.included}
+            otherFields={candidates}
+            externalVariables={definition.externalVariables}
+            error={fieldErrors?.conditions}
+            onChange={(value) => change((current) => setFieldCondition(current, 'included', value))}
           />
           <ConditionEditor
             label="Obligatoriedad"
             condition={field.conditions?.required}
             otherFields={candidates}
+            externalVariables={definition.externalVariables}
             error={fieldErrors?.conditions}
             onChange={(value) => change((current) => setFieldCondition(current, 'required', value))}
           />

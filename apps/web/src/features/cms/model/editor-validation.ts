@@ -1,4 +1,5 @@
-import type { FormContainer, FormDefinition, FormField } from '@tramites/form-contracts';
+import type { ConditionGroup, ConditionRule, ExternalVariable, FormContainer, FormDefinition, FormField } from '@tramites/form-contracts';
+import { containerFields } from '@tramites/form-contracts/field-rules';
 import { duplicateOptionValues, isMaskCompatible, isValidRegexPattern, optionCatalogIncludes } from '@tramites/form-contracts/field-rules';
 import { fieldNameError } from '@tramites/form-contracts/field-name';
 import { validateFieldDefaultValue } from '@tramites/form-contracts/default-value-validation';
@@ -29,6 +30,7 @@ export type ContainerEditorErrors = {
   fieldName?: string;
   rows?: string;
   fields?: string;
+  conditions?: string;
 };
 
 export type DefinitionEditorErrors = {
@@ -36,6 +38,7 @@ export type DefinitionEditorErrors = {
   title?: string;
   submitLabel?: string;
   tipificationKey?: string;
+  conditions?: string;
   containers: Record<string, ContainerEditorErrors>;
   fields: Record<string, FieldEditorErrors>;
   hasErrors: boolean;
@@ -135,15 +138,48 @@ function readOnlyError(field: FormField): string | undefined {
   return undefined;
 }
 
-function conditionErrors(field: FormField, insideRepeater: boolean, candidateIds: Set<string>): string | undefined {
+function conditionLeaves(group: ConditionGroup | undefined): ConditionRule[] {
+  return group ? [...group.rules, ...(group.groups ?? []).flatMap((child) => conditionLeaves(child))] : [];
+}
+
+function externalOperandError(rule: ConditionRule, variable: ExternalVariable): string | undefined {
+  if (['in', 'notIn'].includes(rule.operator)) {
+    if (!Array.isArray(rule.value) || rule.value.length === 0) return 'Los operadores de inclusión requieren al menos un valor';
+  } else if (!['empty', 'notEmpty'].includes(rule.operator)) {
+    if (Array.isArray(rule.value)) return 'La regla requiere un valor escalar';
+    if (rule.value === undefined || rule.value === '') return 'Completá el valor esperado de la condición';
+  }
+  if (['greaterThan', 'greaterThanOrEqual', 'lessThan', 'lessThanOrEqual'].includes(rule.operator) && variable.type !== 'number') {
+    return 'Las comparaciones numéricas requieren una variable number';
+  }
+  if (['empty', 'notEmpty'].includes(rule.operator)) return undefined;
+  const values = Array.isArray(rule.value) ? rule.value : [rule.value];
+  const compatible = values.every((value) => variable.type === 'string'
+    ? typeof value === 'string'
+    : variable.type === 'number'
+      ? typeof value === 'number' && Number.isFinite(value)
+      : typeof value === 'boolean');
+  return compatible ? undefined : `El valor esperado no coincide con el tipo ${variable.type}`;
+}
+
+function conditionErrors(field: FormField, insideRepeater: boolean, candidateIds: Set<string>, externalVariables: ExternalVariable[]): string | undefined {
   const groups = Object.entries(field.conditions ?? {}).filter(([, group]) => group);
   if (groups.length === 0) return undefined;
   if (insideRepeater) return 'Las celdas de una grilla no admiten condiciones';
   for (const [, group] of groups) {
-    if (!group || group.rules.length === 0) return 'Cada condición necesita al menos una regla';
-    for (const rule of group.rules) {
-      if (rule.fieldId === field.id) return 'Una condición no puede depender del propio campo';
-      if (!candidateIds.has(rule.fieldId)) return 'La condición apunta a un campo inexistente o a una celda de grilla';
+    if (!group || conditionLeaves(group).length === 0) return 'Cada condición necesita al menos una regla';
+    for (const rule of conditionLeaves(group)) {
+      const source = rule.source ?? (rule.fieldId ? { kind: 'field' as const, fieldId: rule.fieldId } : undefined);
+      if (!source) return 'La condición necesita un origen';
+      if (source.kind === 'field' && source.fieldId === field.id) return 'Una condición no puede depender del propio campo';
+      if (source.kind === 'field' && !candidateIds.has(source.fieldId)) return 'La condición apunta a un campo inexistente o a una celda de grilla';
+      if (source.kind === 'external') {
+        const variable = externalVariables.find((candidate) => candidate.name === source.variable);
+        if (!variable) return 'La condición apunta a una variable externa no declarada';
+        if (variable.trust === 'presentation') return 'Las variables de presentación solo pueden controlar bloques informativos';
+        const operandError = externalOperandError(rule, variable);
+        if (operandError) return operandError;
+      }
       if (['in', 'notIn'].includes(rule.operator)) {
         if (!Array.isArray(rule.value) || rule.value.length === 0) {
           return 'Los operadores de inclusión requieren al menos un valor';
@@ -159,6 +195,55 @@ function conditionErrors(field: FormField, insideRepeater: boolean, candidateIds
   return undefined;
 }
 
+function elementConditionErrors(
+  groups: Record<string, ConditionGroup | undefined> | undefined,
+  owner: 'form' | 'container',
+  descendantIds: Set<string>,
+  externalVariables: ExternalVariable[],
+  availableIds: Set<string> = descendantIds,
+): string | undefined {
+  for (const group of Object.values(groups ?? {})) {
+    if (conditionLeaves(group).length === 0) return 'Cada condición necesita al menos una regla';
+    for (const rule of conditionLeaves(group)) {
+      const source = rule.source ?? (rule.fieldId ? { kind: 'field' as const, fieldId: rule.fieldId } : undefined);
+      if (!source) return 'La condición necesita un origen';
+      if (source.kind === 'field' && !availableIds.has(source.fieldId)) return 'La condición apunta a un campo inexistente o a una celda de grilla';
+      if (source.kind === 'field' && descendantIds.has(source.fieldId)) return `La condición de ${owner} no puede depender de uno de sus descendientes`;
+      if (source.kind === 'external') {
+        const variable = externalVariables.find((candidate) => candidate.name === source.variable);
+        if (!variable) return 'La condición apunta a una variable externa no declarada';
+        if (variable.trust === 'presentation') return 'Las variables de presentación solo pueden controlar bloques informativos';
+        const operandError = externalOperandError(rule, variable);
+        if (operandError) return operandError;
+      }
+      if (['in', 'notIn'].includes(rule.operator) && (!Array.isArray(rule.value) || rule.value.length === 0)) return 'Los operadores de inclusión requieren al menos un valor';
+      if (!['in', 'notIn', 'empty', 'notEmpty'].includes(rule.operator) && (rule.value === undefined || rule.value === '')) return 'Completá el valor esperado de la condición';
+    }
+  }
+  return undefined;
+}
+
+function textBlockConditionError(
+  group: ConditionGroup | undefined,
+  candidateIds: Set<string>,
+  externalVariables: ExternalVariable[],
+): string | undefined {
+  if (!group) return undefined;
+  if (conditionLeaves(group).length === 0) return 'Cada condición necesita al menos una regla';
+  for (const rule of conditionLeaves(group)) {
+    const source = rule.source ?? (rule.fieldId ? { kind: 'field' as const, fieldId: rule.fieldId } : undefined);
+    if (!source) return 'La condición necesita un origen';
+    if (source.kind === 'field' && !candidateIds.has(source.fieldId)) return 'La condición apunta a un campo inexistente o a una celda de grilla';
+    if (source.kind === 'external') {
+      const variable = externalVariables.find((candidate) => candidate.name === source.variable);
+      if (!variable) return 'La condición apunta a una variable externa no declarada';
+      const operandError = externalOperandError(rule, variable);
+      if (operandError) return operandError;
+    }
+  }
+  return undefined;
+}
+
 function containerErrorsFor(container: FormContainer): ContainerEditorErrors {
   const errors: ContainerEditorErrors = {};
   if (!container.title.trim()) errors.title = 'El título del contenedor es obligatorio';
@@ -166,7 +251,7 @@ function containerErrorsFor(container: FormContainer): ContainerEditorErrors {
 
   const repeaterFieldNameError = fieldNameError(container.fieldName ?? '');
   if (repeaterFieldNameError) errors.fieldName = repeaterFieldNameError;
-  if (container.fields.length === 0) errors.fields = 'La grilla necesita al menos una columna';
+  if (containerFields(container).length === 0) errors.fields = 'La grilla necesita al menos una columna';
 
   const { minRows, maxRows } = container;
   if (!isWholeNumber(minRows) || !isWholeNumber(maxRows)) {
@@ -193,14 +278,14 @@ export function collectDefinitionEditorErrors(definition: FormDefinition, name?:
   const candidateIds = new Set(
     definition.containers
       .filter((container) => container.kind !== 'repeater')
-      .flatMap((container) => container.fields.map((field) => field.id)),
+      .flatMap((container) => containerFields(container).map((field) => field.id)),
   );
 
   const nameError = name !== undefined && !name.trim() ? 'El nombre interno es obligatorio' : undefined;
   const titleError = !definition.title.trim() ? 'El título es obligatorio' : undefined;
   const submitLabelError = !definition.submitLabel.trim() ? 'La etiqueta del botón es obligatoria' : undefined;
-  const tipificationKeyError = definition.schemaVersion === 2 && !definition.tipificationKey?.trim()
-    ? 'La clave de tipificación es obligatoria en formularios v2'
+  const tipificationKeyError = (definition.schemaVersion === 2 || definition.schemaVersion === 3) && !definition.tipificationKey?.trim()
+    ? `La clave de tipificación es obligatoria en formularios v${definition.schemaVersion}`
     : undefined;
 
   const addFieldErrors = (fieldId: string, patch: FieldEditorErrors) => {
@@ -221,7 +306,7 @@ export function collectDefinitionEditorErrors(definition: FormDefinition, name?:
     /** Dentro de una grilla las claves solo tienen que ser únicas entre columnas. */
     const scopeNames = insideRepeater ? new Map<string, string>() : rootNames;
 
-    for (const field of container.fields) {
+    for (const field of containerFields(container)) {
       const identifierError = fieldNameError(field.fieldName);
       const fieldErrors: FieldEditorErrors = {
         fieldName: identifierError,
@@ -229,7 +314,7 @@ export function collectDefinitionEditorErrors(definition: FormDefinition, name?:
         options: optionErrors(field),
         defaultValue: defaultValueError(field),
         readOnly: readOnlyError(field),
-        conditions: conditionErrors(field, insideRepeater, candidateIds),
+        conditions: conditionErrors(field, insideRepeater, candidateIds, definition.externalVariables ?? []),
         ...ruleErrors(field),
       };
       if (insideRepeater && !REPEATER_FIELD_TYPES.includes(field.type)) {
@@ -253,6 +338,18 @@ export function collectDefinitionEditorErrors(definition: FormDefinition, name?:
 
       addFieldErrors(field.id, fieldErrors);
     }
+
+    for (const item of container.items ?? []) {
+      if (item.kind !== 'textBlock') continue;
+      const textBlockError = textBlockConditionError(item.conditions?.visible, candidateIds, definition.externalVariables ?? []);
+      if (textBlockError) containers[container.id] = { ...containers[container.id], conditions: textBlockError };
+    }
+  }
+
+  const formConditionError = elementConditionErrors(definition.conditions, 'form', new Set(candidateIds), definition.externalVariables ?? [], candidateIds);
+  for (const container of definition.containers) {
+    const conditionError = elementConditionErrors(container.conditions, 'container', new Set(containerFields(container).map((field) => field.id)), definition.externalVariables ?? [], candidateIds);
+    if (conditionError) containers[container.id] = { ...containers[container.id], conditions: conditionError };
   }
 
   return {
@@ -260,10 +357,11 @@ export function collectDefinitionEditorErrors(definition: FormDefinition, name?:
     title: titleError,
     submitLabel: submitLabelError,
     tipificationKey: tipificationKeyError,
+    conditions: formConditionError,
     containers,
     fields,
     hasErrors: Boolean(
-      nameError || titleError || submitLabelError || tipificationKeyError || Object.keys(containers).length || Object.keys(fields).length,
+      nameError || titleError || submitLabelError || tipificationKeyError || formConditionError || Object.keys(containers).length || Object.keys(fields).length,
     ),
   };
 }

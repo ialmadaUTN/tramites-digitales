@@ -156,4 +156,39 @@ describe('DefinitionEditor', () => {
     await editor.user.click(screen.getByRole('button', { name: /Agregar primer contenedor/ }));
     expect(editor.definition.containers).toHaveLength(1);
   });
+
+  it('permite declarar una variable externa y agregar un bloque informativo', async () => {
+    const editor = renderEditor();
+    await editor.user.click(screen.getByRole('button', { name: /Agregar variable externa/ }));
+    expect(editor.definition.externalVariables).toHaveLength(1);
+    expect(screen.getByText(/variable1/).closest('.external-variable-row')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Agregar variable externa/ }).classList.contains('external-variable-add')).toBe(true);
+    await editor.user.click(within(containerBox(0)).getByRole('button', { name: /Agregar bloque informativo/ }));
+    expect(editor.definition.containers[0]?.items?.some((item) => item.kind === 'textBlock')).toBe(true);
+    expect(screen.getByText('Bloque informativo')).toBeTruthy();
+  });
+
+  it('edita el tipo/confianza y condiciona el bloque con una variable externa', async () => {
+    const editor = renderEditor();
+    await editor.user.click(screen.getByRole('button', { name: /Agregar variable externa/ }));
+    const variableRow = screen.getByText(/variable1/).closest('.form-group') as HTMLElement;
+    await editor.user.selectOptions(within(variableRow).getByText('Tipo').parentElement!.querySelector('select') as HTMLSelectElement, 'number');
+    await editor.user.selectOptions(within(variableRow).getByText('Confianza').parentElement!.querySelector('select') as HTMLSelectElement, 'trusted');
+    await editor.user.click(within(containerBox(0)).getByRole('button', { name: /Agregar bloque informativo/ }));
+
+    const block = screen.getByText('Bloque informativo').closest('.field-editor') as HTMLElement;
+    const title = within(block).getByText('Título').closest('.form-group')!.querySelector('input') as HTMLInputElement;
+    const body = within(block).getByText('Texto').closest('.form-group')!.querySelector('textarea') as HTMLTextAreaElement;
+    await editor.user.clear(title);
+    await editor.user.type(title, 'Ayuda');
+    await editor.user.clear(body);
+    await editor.user.type(body, 'Contenido contextual');
+    await editor.user.click(within(block).getByLabelText('Visibilidad condicional'));
+    const source = within(block).getByText('Depende del campo').closest('.form-group')!.querySelector('select') as HTMLSelectElement;
+    await editor.user.selectOptions(source, 'external:variable1');
+
+    const item = editor.definition.containers[0]?.items?.find((candidate) => candidate.kind === 'textBlock');
+    expect(editor.definition.externalVariables?.[0]).toMatchObject({ type: 'number', trust: 'trusted' });
+    expect(item).toMatchObject({ title: 'Ayuda', text: 'Contenido contextual', conditions: { visible: { rules: [{ source: { kind: 'external', variable: 'variable1' } }] } } });
+  });
 });
