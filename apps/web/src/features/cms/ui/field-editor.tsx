@@ -36,6 +36,9 @@ type FieldEditorProps = {
   field: FormField;
   index: number;
   definition: FormDefinition;
+  containerId?: string;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
   fieldErrors?: FieldEditorErrors;
   repeater?: boolean;
   setDefinition: (definition: FormDefinition) => void;
@@ -135,7 +138,7 @@ function DefaultValueControl({ field, onChange }: { field: FormField; onChange: 
   );
 }
 
-export function FieldEditor({ field, index, definition, fieldErrors, repeater = false, setDefinition }: FieldEditorProps) {
+export function FieldEditor({ field, index, definition, containerId: _containerId, canMoveUp = true, canMoveDown = true, fieldErrors, repeater = false, setDefinition }: FieldEditorProps) {
   const change = (update: (current: FormField) => FormField) => setDefinition(updateField(definition, field.id, update));
   const candidates = otherFields(definition, field.id);
   const fallbackConditionSource = candidates[0]
@@ -169,6 +172,7 @@ export function FieldEditor({ field, index, definition, fieldErrors, repeater = 
             type="button"
             className="button sm ghost"
             onClick={() => setDefinition(moveField(definition, field.id, -1))}
+            disabled={!canMoveUp}
             title="Mover arriba"
           >
             ↑
@@ -177,6 +181,7 @@ export function FieldEditor({ field, index, definition, fieldErrors, repeater = 
             type="button"
             className="button sm ghost"
             onClick={() => setDefinition(moveField(definition, field.id, 1))}
+            disabled={!canMoveDown}
             title="Mover abajo"
           >
             ↓

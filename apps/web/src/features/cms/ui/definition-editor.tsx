@@ -2,7 +2,7 @@
 
 import type { ConditionGroup, FormDefinition } from '@tramites/form-contracts';
 import { containerFields } from '@tramites/form-contracts/field-rules';
-import { addContainer, addExternalVariable, addField, addTextBlock, moveContainer, removeContainer, removeExternalVariable, removeTextBlock, setContainerCondition, setFormCondition, updateContainer, updateExternalVariable, updateTextBlock } from '../model/definition';
+import { addContainer, addExternalVariable, addField, addTextBlock, moveContainer, moveContainerItem, removeContainer, removeExternalVariable, removeTextBlock, setContainerCondition, setFormCondition, updateContainer, updateExternalVariable, updateTextBlock } from '../model/definition';
 import type { DefinitionEditorErrors } from '../model/editor-validation';
 import { FieldEditor } from './field-editor';
 import { ConditionEditor } from './condition-editor';
@@ -61,7 +61,7 @@ export function DefinitionEditor({ definition, editorErrors, setDefinition }: De
         </div>
         <div className="external-variable-catalog">
           <label>Variables externas del host</label>
-          <span className="hint">Las variables trusted requieren contexto firmado; las de presentación solo pueden controlar bloques informativos.</span>
+          <span className="hint">Las variables trusted requieren contexto firmado para reglas de datos; título y contenido de bloques pueden resolver cualquier variable que el host envíe.</span>
           <div className="external-variable-list">
             {(definition.externalVariables ?? []).map((variable) => (
               <div className="form-group external-variable-row" key={variable.name}>
@@ -217,16 +217,26 @@ export function DefinitionEditor({ definition, editorErrors, setDefinition }: De
                 field={item.field}
                 index={itemIndex}
                 definition={definition}
+                containerId={container.id}
+                canMoveUp={itemIndex > 0}
+                canMoveDown={itemIndex < (container.items ?? container.fields.map((field) => ({ kind: 'field' as const, field }))).length - 1}
                 repeater={container.kind === 'repeater'}
                 fieldErrors={editorErrors.fields[item.field.id]}
                 setDefinition={setDefinition}
               />
             ) : (
-              <div className="field-editor" key={item.id}>
-                <div className="field-head"><span className="field-badge-type">Bloque informativo</span><button type="button" className="button sm danger" onClick={() => setDefinition(removeTextBlock(definition, item.id))}>Eliminar</button></div>
+              <div className={`field-editor${editorErrors.textBlocks[item.id] ? ' has-error' : ''}`} key={item.id}>
+                <div className="field-head">
+                  <span className="field-badge-type"><span style={{ color: 'var(--ink-muted)', fontSize: 11, fontWeight: 800 }}>#{itemIndex + 1}</span>Bloque informativo</span>
+                  <div className="toolbar-actions">
+                    <button type="button" className="button sm ghost" onClick={() => setDefinition(moveContainerItem(definition, item.id, -1))} disabled={itemIndex === 0} title="Mover arriba">↑</button>
+                    <button type="button" className="button sm ghost" onClick={() => setDefinition(moveContainerItem(definition, item.id, 1))} disabled={itemIndex === (container.items ?? container.fields.map((field) => ({ kind: 'field' as const, field }))).length - 1} title="Mover abajo">↓</button>
+                    <button type="button" className="button sm danger" onClick={() => setDefinition(removeTextBlock(definition, item.id))}>Eliminar</button>
+                  </div>
+                </div>
                 <div className="form-grid">
-                  <div className="form-group"><label>Título</label><input value={item.title ?? ''} onChange={(event) => setDefinition(updateTextBlock(definition, item.id, (current) => ({ ...current, title: event.target.value })))} /></div>
-                  <div className="form-group full"><label>Texto</label><textarea value={item.text} onChange={(event) => setDefinition(updateTextBlock(definition, item.id, (current) => ({ ...current, text: event.target.value })))} /></div>
+                  <div className="form-group"><label>Título</label><input value={item.title ?? ''} className={editorErrors.textBlocks[item.id]?.title ? 'invalid' : undefined} aria-invalid={Boolean(editorErrors.textBlocks[item.id]?.title)} onChange={(event) => setDefinition(updateTextBlock(definition, item.id, (current) => ({ ...current, title: event.target.value })))} />{editorErrors.textBlocks[item.id]?.title && <span className="field-error">{editorErrors.textBlocks[item.id]?.title}</span>}</div>
+                  <div className="form-group full"><label>Contenido</label><textarea value={item.text} className={editorErrors.textBlocks[item.id]?.text ? 'invalid' : undefined} aria-invalid={Boolean(editorErrors.textBlocks[item.id]?.text)} onChange={(event) => setDefinition(updateTextBlock(definition, item.id, (current) => ({ ...current, text: event.target.value })))} />{editorErrors.textBlocks[item.id]?.text && <span className="field-error">{editorErrors.textBlocks[item.id]?.text}</span>}<span className="hint">Podés usar variables externas con la forma <code>{'{{customerName}}'}</code>.</span></div>
                   <div className="form-group full"><label className="checkbox-row"><input type="checkbox" checked={Boolean(item.conditions?.visible)} onChange={(event) => setDefinition(updateTextBlock(definition, item.id, (current) => ({ ...current, conditions: event.target.checked ? { visible: current.conditions?.visible ?? toggleElementCondition(undefined, true)! } : undefined })))} /> Visibilidad condicional</label></div>
                 </div>
                 {item.conditions?.visible && <ConditionEditor label="Visibilidad del bloque" condition={item.conditions.visible} otherFields={conditionFields} externalVariables={definition.externalVariables} onChange={(value) => setDefinition(updateTextBlock(definition, item.id, (current) => ({ ...current, conditions: { visible: value } })))} />}

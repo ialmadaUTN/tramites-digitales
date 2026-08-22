@@ -178,7 +178,7 @@ describe('DefinitionEditor', () => {
 
     const block = screen.getByText('Bloque informativo').closest('.field-editor') as HTMLElement;
     const title = within(block).getByText('Título').closest('.form-group')!.querySelector('input') as HTMLInputElement;
-    const body = within(block).getByText('Texto').closest('.form-group')!.querySelector('textarea') as HTMLTextAreaElement;
+    const body = within(block).getByText('Contenido').closest('.form-group')!.querySelector('textarea') as HTMLTextAreaElement;
     await editor.user.clear(title);
     await editor.user.type(title, 'Ayuda');
     await editor.user.clear(body);
@@ -190,5 +190,17 @@ describe('DefinitionEditor', () => {
     const item = editor.definition.containers[0]?.items?.find((candidate) => candidate.kind === 'textBlock');
     expect(editor.definition.externalVariables?.[0]).toMatchObject({ type: 'number', trust: 'trusted' });
     expect(item).toMatchObject({ title: 'Ayuda', text: 'Contenido contextual', conditions: { visible: { rules: [{ source: { kind: 'external', variable: 'variable1' } }] } } });
+  });
+
+  it('permite reordenar y eliminar un bloque junto con los campos', async () => {
+    const editor = renderEditor();
+    await editor.user.click(within(containerBox(0)).getByRole('button', { name: /Agregar bloque informativo/ }));
+    const blockId = editor.definition.containers[0]?.items?.find((item) => item.kind === 'textBlock')?.id;
+    const block = screen.getByText('Bloque informativo').closest('.field-editor') as HTMLElement;
+    await within(block).getByTitle('Mover arriba').click();
+    expect(editor.definition.containers[0]?.items?.map((item) => item.kind === 'field' ? item.field.id : item.id).at(-2)).toBe(blockId);
+    const movedBlock = screen.getByText('Bloque informativo').closest('.field-editor') as HTMLElement;
+    await within(movedBlock).getByRole('button', { name: 'Eliminar' }).click();
+    expect(editor.definition.containers[0]?.items?.some((item) => item.kind === 'textBlock')).toBe(false);
   });
 });

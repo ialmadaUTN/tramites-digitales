@@ -69,7 +69,7 @@ test('un formulario creado en el CMS se publica y se completa en el host', async
   await page.getByRole('button', { name: /Agregar bloque informativo/ }).first().click();
   const contextualBlock = fieldEditor(page, 1);
   await contextualBlock.locator('.form-group').filter({ hasText: 'Título' }).locator('input').fill('Información contextual');
-  await contextualBlock.locator('.form-group').filter({ hasText: 'Texto' }).locator('textarea').fill('Visible para el contexto firmado');
+  await contextualBlock.locator('.form-group').filter({ hasText: 'Contenido' }).locator('textarea').fill('Cliente: {{variable2}}');
   await contextualBlock.getByLabel('Visibilidad condicional').check();
   await contextualBlock.locator('.condition-rule').locator('select').first().selectOption('external:variable1');
   await contextualBlock.locator('.condition-rule').locator('input').fill('2050');
@@ -99,6 +99,7 @@ test('un formulario creado en el CMS se publica y se completa en el host', async
   await page.goto(hostHref!);
   await expect(page.getByRole('heading', { name: 'Solicitud de prueba' })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText('Información contextual')).toBeVisible();
+  await expect(page.getByText('Cliente: 2050')).toBeVisible();
 
   // El campo de solo lectura llega con su valor y no se puede editar.
   const readOnlyInput = page.getByLabel(/Sucursal/);

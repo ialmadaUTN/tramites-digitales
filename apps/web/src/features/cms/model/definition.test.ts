@@ -11,6 +11,7 @@ import {
   changeFieldType,
   moveContainer,
   moveField,
+  moveContainerItem,
   moveOption,
   parseDefaultValue,
   parseOptions,
@@ -152,6 +153,20 @@ describe('definition mutations', () => {
     expect(externalVariableCandidates({ ...definition, externalVariables: [{ name: 'v', label: 'V', type: 'string', trust: 'presentation' }] })).toHaveLength(1);
     expect(setConditionLogic({ logic: 'all', rules: [{ fieldId: 'f1', operator: 'notEmpty' }] }, 'any').logic).toBe('any');
     expect(addConditionRule({ logic: 'all', rules: [{ fieldId: 'f1', operator: 'notEmpty' }] }, { kind: 'external', variable: 'v' }).rules.at(-1)?.source).toEqual({ kind: 'external', variable: 'v' });
+  });
+
+  it('reordena bloques y campos en una única secuencia de ítems', () => {
+    const ordered = {
+      ...definition,
+      containers: [{ ...definition.containers[0]!, items: [
+        { kind: 'field' as const, field: definition.containers[0]!.fields[0]! },
+        { kind: 'textBlock' as const, id: 'info', text: 'Ayuda' },
+        { kind: 'field' as const, field: definition.containers[0]!.fields[1]! },
+      ] }],
+    };
+    const moved = moveContainerItem(ordered, 'info', -1);
+    expect(moved.containers[0]?.items?.map((item) => item.kind === 'field' ? item.field.id : item.id)).toEqual(['info', 'f1', 'f2']);
+    expect(moved.containers[0]?.fields.map((field) => field.id)).toEqual(['f1', 'f2']);
   });
 
   it('covers ordered-item updates, condition editing and field rule helpers', () => {

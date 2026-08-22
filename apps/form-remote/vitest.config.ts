@@ -9,7 +9,7 @@ export default defineConfig({
       // Piso = lo ya alcanzado (ratchet): impide retroceder sin fingir una
       // meta. El hueco grande es `use-runtime-form` + `dynamic-field` +
       // `dynamic-repeater`, que es la próxima tanda de tests de interacción.
-      { statements: 26, branches: 18, functions: 30, lines: 26 },
+      { statements: 61, branches: 53, functions: 57, lines: 63 },
       [
         // Adaptadores de red y de Supabase: sin lógica propia, se verifican en
         // los e2e contra los servicios reales.
