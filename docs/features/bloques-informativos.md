@@ -1,0 +1,45 @@
+# Bloques informativos
+
+> **Mantené este documento al día.** Toda modificación del contrato, CMS o renderer que cambie los bloques informativos debe actualizar este documento y sumar una línea al historial.
+
+## Qué resuelve
+
+Permite insertar texto explicativo dentro de una sección del formulario, por ejemplo instrucciones, advertencias o información contextual. El bloque puede mostrarse según una variable de presentación del host y nunca genera datos ni validaciones.
+
+## Cómo funciona
+
+Las definiciones v3 guardan los hijos de una sección en `items`, preservando el orden entre campos y bloques. Las definiciones anteriores se proyectan a ítems de campo cuando se abren en el CMS.
+
+| Capa | Responsabilidad |
+| --- | --- |
+| `packages/form-contracts/src/index.ts` | Define `textBlock`, sus plantillas de título/contenido y su condición `visible`; valida referencias externas y que no tenga reglas de payload. |
+| `packages/form-contracts/src/field-rules.ts` | Analiza y resuelve placeholders `{{variable}}` usando valores escalares del host. |
+| `apps/web/src/features/cms/ui/definition-editor.tsx` | Crea y edita el bloque dentro de una sección. |
+| `apps/form-remote/src/features/runtime/ui/dynamic-form.tsx` | Renderiza el bloque solo cuando su condición se cumple. |
+| `apps/bff` | Ignora los bloques durante la validación, limpieza y entrega de submissions. |
+
+Los bloques solo admiten `visible`. No tienen `enabled`, `included`, `required`, `fieldName` ni valor persistible. Una variable externa marcada `presentation` puede controlar su visibilidad; una variable `trusted` también es válida, aunque no aporta autorización. El título (opcional) y el contenido admiten texto estático o placeholders como `{{customerName}}`; la variable debe estar declarada en el catálogo externo y el host debe enviarla en `DynamicFormProps.externalVariables`.
+
+## Restricciones
+
+- Solo se pueden agregar a secciones normales; las columnas de una grilla repetible siguen siendo campos.
+- El texto debe ser no vacío y el título es opcional.
+- `{{nombre}}` es la única sintaxis dinámica; se permiten espacios dentro de las llaves, pero un placeholder incompleto, inválido o no declarado bloquea el guardado y la publicación.
+- Los valores `0` y `false` son válidos. Un valor ausente, nulo o textual vacío/espacios en un bloque visible produce el estado de error `MISSING_EXTERNAL_VARIABLE`, se informa mediante `onError` y no se muestra el formulario. Un bloque oculto no resuelve sus plantillas ni provoca ese error.
+- Una condición de bloque no puede impedir ni exigir un campo.
+- Los valores del bloque no se guardan en el payload ni se envían a Dynamics.
+- El contenido se monta como texto React; no se interpreta HTML, no se ejecuta código y una etiqueta enviada como valor se muestra literalmente.
+
+## Dónde mirar
+
+| Qué | Dónde |
+| --- | --- |
+| Esquema | `packages/form-contracts/src/index.ts` (`textBlockSchema`, `formItemSchema`) |
+| Mutaciones del CMS | `apps/web/src/features/cms/model/definition.ts` |
+| Editor | `apps/web/src/features/cms/ui/definition-editor.tsx` |
+| Runtime | `apps/form-remote/src/features/runtime/ui/dynamic-form.tsx` |
+
+## Historial de cambios
+
+- **2026-08-21** — Se incorporaron bloques de texto ordenados por sección, con visibilidad condicional y sin efecto sobre validación o payload.
+- **2026-08-21** — Los bloques incorporaron plantillas seguras en título y contenido, validación contra variables externas, reordenamiento junto a campos y error explícito cuando falta contexto en un bloque visible.

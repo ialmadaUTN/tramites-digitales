@@ -1,6 +1,6 @@
 import { Controller } from 'react-hook-form';
 import type { FormField } from '@tramites/form-contracts';
-import { isFieldEnabled, isFieldReadOnly, isFieldRequired, isFieldVisible } from '@tramites/form-contracts';
+import { isFieldEnabled, isFieldIncluded, isFieldReadOnly, isFieldRequired, isFieldVisible, type ExternalVariableValues } from '@tramites/form-contracts';
 import type { FormValues } from '../../../../shared/types/form-values';
 import { valuesByFieldId } from '../../model/field-state';
 import type { FieldControlProps } from './types';
@@ -10,14 +10,17 @@ type DynamicFieldProps = Omit<FieldControlProps, 'enabled' | 'options'> & {
   values: FormValues;
   errors: Record<string, { message?: string } | undefined>;
   fieldMap: Map<string, FormField>;
+  externalVariables?: ExternalVariableValues;
+  ancestorEnabled?: boolean;
+  ancestorIncluded?: boolean;
   uploadFile?: (fieldName: string, file: File) => Promise<import('@tramites/form-contracts').UploadReference>;
 };
 
-export function DynamicField({ field, control, values, errors, fieldMap, uploadFile }: DynamicFieldProps) {
+export function DynamicField({ field, control, values, errors, fieldMap, externalVariables = {}, ancestorEnabled = true, ancestorIncluded = true, uploadFile }: DynamicFieldProps) {
   const byId = valuesByFieldId(fieldMap, values);
-  if (!isFieldVisible(field, byId)) return null;
-  const enabled = isFieldEnabled(field, byId);
-  const required = isFieldRequired(field, byId);
+  if (!isFieldVisible(field, byId, externalVariables)) return null;
+  const enabled = ancestorEnabled && isFieldEnabled(field, byId, externalVariables);
+  const required = enabled && ancestorIncluded && isFieldIncluded(field, byId, externalVariables) && isFieldRequired(field, byId, externalVariables);
   const error = errors[field.fieldName]?.message;
   const options = field.options ?? [];
   const renderField = getFieldRenderer(field.type);

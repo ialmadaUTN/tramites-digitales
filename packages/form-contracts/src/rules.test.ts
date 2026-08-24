@@ -86,6 +86,23 @@ describe('rechazo de definiciones inválidas', () => {
     expect(definitionErrors(rawDefinition(target))).toMatch(expected);
   });
 
+  const textBlockCases: [name: string, block: Record<string, unknown>, expected: RegExp][] = [
+    ['contenido informativo vacío', { id: 'info', kind: 'textBlock', text: '   ' }, /contenido del bloque no puede estar vacío/],
+    ['plantilla con variable no declarada', { id: 'info', kind: 'textBlock', text: '{{customerName}}' }, /variable externa no declarada/],
+    ['plantilla malformada', { id: 'info', kind: 'textBlock', text: '{{customerName' }, /variable queda abierta/],
+  ];
+
+  it.each(textBlockCases)('rechaza %s', (_name, block, expected) => {
+    expect(definitionErrors({
+      schemaVersion: 3,
+      tipificationKey: 'generic@v1',
+      externalVariables: [],
+      title: 'Reglas',
+      submitLabel: 'Enviar',
+      containers: [{ id: 'c1', title: 'Uno', kind: 'section', columns: 1, fields: [], items: [block] }],
+    })).toMatch(expected);
+  });
+
   it('acepta una definición que cumple todas las reglas', () => {
     expect(definitionErrors(rawDefinition({ type: 'text', rules: { minLength: 2, maxLength: 8, pattern: '^[a-z]+$' } }))).toBe('');
   });

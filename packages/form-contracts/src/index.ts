@@ -38,7 +38,10 @@ import {
   MULTI_VALUE_FIELD_TYPES,
   READ_ONLY_UNSUPPORTED_FIELD_TYPES,
   REPEATER_FIELD_TYPES,
+  textTemplateError,
   TEXT_LENGTH_FIELD_TYPES,
+  containerFields,
+  containerItems,
 } from './field-rules.js';
 
 export const fieldNameSchema = z
@@ -86,19 +89,91 @@ export const conditionOperatorSchema = z.enum([
 ]);
 export type ConditionOperator = z.infer<typeof conditionOperatorSchema>;
 
+export const externalVariableTypeSchema = z.enum(['string', 'number', 'boolean']);
+export type ExternalVariableType = z.infer<typeof externalVariableTypeSchema>;
+
+export const externalVariableTrustSchema = z.enum(['trusted', 'presentation']);
+export type ExternalVariableTrust = z.infer<typeof externalVariableTrustSchema>;
+
+export const externalVariableSchema = z.object({
+  name: fieldNameSchema,
+  label: z.string().trim().min(1),
+  type: externalVariableTypeSchema,
+  trust: externalVariableTrustSchema.default('presentation'),
+});
+export type ExternalVariable = z.infer<typeof externalVariableSchema>;
+
+const conditionSourceSchema = z.union([
+  z.object({ kind: z.literal('field'), fieldId: z.string().min(1) }),
+  z.object({ kind: z.literal('external'), variable: fieldNameSchema }),
+]);
+export type ConditionSource = z.infer<typeof conditionSourceSchema>;
+
+/**
+ * `fieldId` is kept as a read-compatible shorthand for v2 definitions. New
+ * definitions should use the discriminated `source` member.
+ */
 export const conditionRuleSchema = z.object({
-  fieldId: z.string().min(1),
+  fieldId: z.string().min(1).optional(),
+  source: conditionSourceSchema.optional(),
   operator: conditionOperatorSchema,
   value: z.unknown().optional(),
+}).superRefine((rule, ctx) => {
+  if (!rule.fieldId && !rule.source) ctx.addIssue({ code: 'custom', path: ['source'], message: 'La condición necesita un origen' });
+  if (rule.fieldId && rule.source) ctx.addIssue({ code: 'custom', path: ['source'], message: 'No se puede declarar fieldId y source a la vez' });
+  if (['in', 'notIn'].includes(rule.operator) && (!Array.isArray(rule.value) || rule.value.length === 0)) {
+    ctx.addIssue({ code: 'custom', path: ['value'], message: 'Los operadores de inclusión requieren una lista no vacía' });
+  }
+  if (['equals', 'notEquals', 'greaterThan', 'greaterThanOrEqual', 'lessThan', 'lessThanOrEqual'].includes(rule.operator) && Array.isArray(rule.value)) {
+    ctx.addIssue({ code: 'custom', path: ['value'], message: 'La regla requiere un valor escalar' });
+  }
+  if (!['empty', 'notEmpty', 'in', 'notIn'].includes(rule.operator) && rule.value === undefined) {
+    ctx.addIssue({ code: 'custom', path: ['value'], message: 'La regla necesita un valor esperado' });
+  }
 });
-
 export type ConditionRule = z.infer<typeof conditionRuleSchema>;
 
-export const conditionGroupSchema = z.object({
+export type ConditionGroup = {
+  logic: 'all' | 'any';
+  rules: ConditionRule[];
+  groups?: ConditionGroup[];
+};
+
+/** Limits that keep author-supplied expressions bounded for every evaluator. */
+export const MAX_CONDITION_DEPTH = 8;
+export const MAX_CONDITION_TERMS = 50;
+
+function conditionStats(group: ConditionGroup, depth = 1): { depth: number; terms: number } {
+  return (group.groups ?? []).reduce(
+    (stats, child) => {
+      const childStats = conditionStats(child, depth + 1);
+      return { depth: Math.max(stats.depth, childStats.depth), terms: stats.terms + childStats.terms };
+    },
+    { depth, terms: group.rules.length },
+  );
+}
+
+function conditionLeaves(group: ConditionGroup | undefined): ConditionRule[] {
+  if (!group) return [];
+  return [...group.rules, ...(group.groups ?? []).flatMap((child) => conditionLeaves(child))];
+}
+
+export const conditionGroupSchema: z.ZodType<ConditionGroup> = z.lazy(() => z.object({
   logic: z.enum(['all', 'any']),
-  rules: z.array(conditionRuleSchema).min(1),
-});
-export type ConditionGroup = z.infer<typeof conditionGroupSchema>;
+  rules: z.array(conditionRuleSchema).default([]),
+  groups: z.array(conditionGroupSchema).optional(),
+}).superRefine((group, ctx) => {
+  if (group.rules.length === 0 && (!group.groups || group.groups.length === 0)) {
+    ctx.addIssue({ code: 'custom', path: ['rules'], message: 'La condición necesita al menos una regla o grupo' });
+  }
+  const stats = conditionStats(group);
+  if (stats.depth > MAX_CONDITION_DEPTH) {
+    ctx.addIssue({ code: 'custom', path: ['groups'], message: `La condición no puede superar ${MAX_CONDITION_DEPTH} niveles` });
+  }
+  if (stats.terms > MAX_CONDITION_TERMS) {
+    ctx.addIssue({ code: 'custom', path: ['rules'], message: `La condición no puede superar ${MAX_CONDITION_TERMS} reglas` });
+  }
+}));
 
 export const fieldRulesSchema = z.object({
   required: z.boolean().optional(),
@@ -124,9 +199,17 @@ export type FieldRules = z.infer<typeof fieldRulesSchema>;
 export const fieldConditionsSchema = z.object({
   visible: conditionGroupSchema.optional(),
   enabled: conditionGroupSchema.optional(),
+  included: conditionGroupSchema.optional(),
   required: conditionGroupSchema.optional(),
 });
 export type FieldConditions = z.infer<typeof fieldConditionsSchema>;
+
+export const elementConditionsSchema = z.object({
+  visible: conditionGroupSchema.optional(),
+  enabled: conditionGroupSchema.optional(),
+  included: conditionGroupSchema.optional(),
+});
+export type ElementConditions = z.infer<typeof elementConditionsSchema>;
 
 const defaultValueSchema = z.union([scalarValueSchema, z.array(scalarValueSchema)]);
 
@@ -156,6 +239,21 @@ export const formFieldSchema = z.object({
 });
 export type FormField = z.infer<typeof formFieldSchema>;
 
+export const textBlockSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal('textBlock'),
+  title: z.string().optional(),
+  text: z.string().min(1).refine((value) => value.trim().length > 0, 'El contenido del bloque no puede estar vacío'),
+  conditions: z.object({ visible: conditionGroupSchema.optional() }).strict().optional(),
+});
+export type TextBlock = z.infer<typeof textBlockSchema>;
+
+export const formItemSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('field'), field: formFieldSchema }),
+  textBlockSchema,
+]);
+export type FormItem = z.infer<typeof formItemSchema>;
+
 export const formContainerSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
@@ -164,32 +262,60 @@ export const formContainerSchema = z.object({
   columns: z.union([z.literal(1), z.literal(2)]).default(1),
   minRows: z.number().int().nonnegative().optional(),
   maxRows: z.number().int().positive().max(50).optional(),
-  fields: z.array(formFieldSchema),
+  /** Legacy field list. v3 uses `items` to preserve field/block order. */
+  fields: z.array(formFieldSchema).default([]),
+  items: z.array(formItemSchema).optional(),
+  conditions: elementConditionsSchema.optional(),
 });
 export type FormContainer = z.infer<typeof formContainerSchema>;
 
 export const formDefinitionSchema = z
   .object({
-    schemaVersion: z.literal(2).optional(),
+    schemaVersion: z.union([z.literal(2), z.literal(3)]).optional(),
     tipificationKey: z.string().trim().min(1).optional(),
     title: z.string().min(1).max(200),
     description: z.string().optional(),
     submitLabel: z.string().min(1).max(80).default('Enviar'),
+    conditions: elementConditionsSchema.optional(),
+    externalVariables: z.array(externalVariableSchema).optional(),
     containers: z.array(formContainerSchema),
   })
   .superRefine((definition, ctx) => {
-    const isV2 = definition.schemaVersion === 2;
+    const isV2 = definition.schemaVersion === 2 || definition.schemaVersion === 3;
+    const isV3 = definition.schemaVersion === 3;
     const v2FieldTypes = new Set<FieldType>(['email', 'phone', 'alphabetic', 'alphanumeric', 'multiselect', 'fileUpload']);
     const repeaterFieldTypes = new Set<FieldType>(REPEATER_FIELD_TYPES);
     const fieldIds = new Set<string>();
     const allFieldIds = new Set<string>();
     const fieldNames = new Set<string>();
     const fieldsById = new Map<string, FormField>();
+    const externalVariables = definition.externalVariables ?? [];
+    const externalNames = new Set<string>();
+    for (const [index, variable] of externalVariables.entries()) {
+      if (externalNames.has(variable.name)) {
+        ctx.addIssue({ code: 'custom', path: ['externalVariables', index, 'name'], message: `Variable externa duplicada: ${variable.name}` });
+      }
+      externalNames.add(variable.name);
+    }
+    if (isV3 && !definition.externalVariables) {
+      // An absent catalog is equivalent to an empty catalog, but keeping the
+      // key explicit makes the v3 contract self-describing after save.
+      ctx.addIssue({ code: 'custom', path: ['externalVariables'], message: 'Un formulario v3 requiere catálogo de variables externas' });
+    }
+    if (!isV3 && definition.externalVariables && definition.externalVariables.length > 0) {
+      ctx.addIssue({ code: 'custom', path: ['externalVariables'], message: 'Las variables externas requieren schemaVersion 3' });
+    }
+    if (!isV3 && definition.conditions) {
+      ctx.addIssue({ code: 'custom', path: ['conditions'], message: 'Las condiciones del formulario requieren schemaVersion 3' });
+    }
     if (isV2 && !definition.tipificationKey) {
       ctx.addIssue({ code: 'custom', path: ['tipificationKey'], message: 'Un formulario v2 requiere tipificationKey' });
     }
     definition.containers.forEach((container, containerIndex) => {
       const isRepeater = container.kind === 'repeater';
+      if (!isV3 && container.conditions) {
+        ctx.addIssue({ code: 'custom', path: ['containers', containerIndex, 'conditions'], message: 'Las condiciones de sección requieren schemaVersion 3' });
+      }
       if (isRepeater) {
         if (!isV2) {
           ctx.addIssue({ code: 'custom', path: ['containers', containerIndex, 'kind'], message: 'Las grillas repetibles requieren schemaVersion 2' });
@@ -200,9 +326,12 @@ export const formDefinitionSchema = z
         if (container.minRows !== undefined && container.maxRows !== undefined && container.minRows > container.maxRows) {
           ctx.addIssue({ code: 'custom', path: ['containers', containerIndex, 'minRows'], message: 'minRows no puede superar maxRows' });
         }
+        if (container.items?.some((item) => item.kind === 'textBlock')) {
+          ctx.addIssue({ code: 'custom', path: ['containers', containerIndex, 'items'], message: 'Las grillas solo pueden contener campos' });
+        }
         const repeaterFieldIds = new Set<string>();
         const repeaterFieldNames = new Set<string>();
-        for (const [fieldIndex, field] of container.fields.entries()) {
+        for (const [fieldIndex, field] of containerFields(container).entries()) {
           const fieldPath = ['containers', containerIndex, 'fields', fieldIndex] as const;
           if (!repeaterFieldTypes.has(field.type)) {
             ctx.addIssue({ code: 'custom', path: ['containers', containerIndex, 'fields', fieldIndex, 'type'], message: `${field.type} no está permitido dentro de una grilla` });
@@ -225,7 +354,7 @@ export const formDefinitionSchema = z
         }
         if (container.fieldName) fieldNames.add(container.fieldName);
       }
-      container.fields.forEach((field, fieldIndex) => {
+      containerFields(container).forEach((field, fieldIndex) => {
         const fieldPath = ['containers', containerIndex, 'fields', fieldIndex] as const;
         if (!isRepeater) {
           if (allFieldIds.has(field.id)) {
@@ -297,18 +426,83 @@ export const formDefinitionSchema = z
           ctx.addIssue({ code: 'custom', path: [...fieldPath, 'type'], message: `${field.type} requiere schemaVersion 2` });
         }
         if (!isRepeater) {
+          if (!isV3 && field.conditions?.included) {
+            ctx.addIssue({ code: 'custom', path: [...fieldPath, 'conditions', 'included'], message: 'La inclusión condicional requiere schemaVersion 3' });
+          }
           for (const [conditionKey, condition] of Object.entries(field.conditions ?? {})) {
-          for (const [ruleIndex, rule] of (condition?.rules ?? []).entries()) {
-            if (rule.fieldId === field.id) {
+          for (const [ruleIndex, rule] of conditionLeaves(condition).entries()) {
+            const source = sourceOf(rule);
+            if (source?.kind === 'field' && source.fieldId === field.id) {
               ctx.addIssue({ code: 'custom', path: [...fieldPath, 'conditions', conditionKey, 'rules', ruleIndex, 'fieldId'], message: `La condición de ${field.id} se referencia a sí misma` });
             }
-            if (!fieldIds.has(rule.fieldId) && !definition.containers.filter((candidate) => candidate.kind !== 'repeater').some((candidate) => candidate.fields.some((candidateField) => candidateField.id === rule.fieldId))) {
+            if (source?.kind === 'external' && !externalNames.has(source.variable)) {
+              ctx.addIssue({ code: 'custom', path: [...fieldPath, 'conditions', conditionKey, 'rules', ruleIndex, 'source'], message: `Variable externa no declarada: ${source.variable}` });
+            }
+            if (source?.kind === 'field' && !fieldIds.has(source.fieldId) && !definition.containers.filter((candidate) => candidate.kind !== 'repeater').some((candidate) => containerFields(candidate).some((candidateField) => candidateField.id === source.fieldId))) {
               ctx.addIssue({ code: 'custom', path: [...fieldPath, 'conditions', conditionKey, 'rules', ruleIndex, 'fieldId'], message: `Campo referido inexistente: ${rule.fieldId}` });
             }
           }
           }
         }
       });
+    });
+
+    const externalByName = new Map(externalVariables.map((variable) => [variable.name, variable]));
+    const validateConditionGroups = (
+      groups: Record<string, ConditionGroup | undefined>,
+      path: (string | number)[],
+      owner: 'form' | 'container' | 'field' | 'textBlock',
+      descendantFieldIds?: Set<string>,
+    ) => {
+      for (const [key, group] of Object.entries(groups)) {
+        for (const [ruleIndex, rule] of conditionLeaves(group).entries()) {
+          const source = sourceOf(rule);
+          if (owner !== 'field' && source?.kind === 'field' && !fieldIds.has(source.fieldId)) {
+            ctx.addIssue({ code: 'custom', path: [...path, key, 'rules', ruleIndex, 'source'], message: `Campo referido inexistente: ${source.fieldId}` });
+          }
+          if (source?.kind === 'field' && descendantFieldIds?.has(source.fieldId)) {
+            ctx.addIssue({ code: 'custom', path: [...path, key, 'rules', ruleIndex, 'source'], message: `La condición de ${owner} no puede depender de uno de sus descendientes` });
+          }
+          if (source?.kind !== 'external') continue;
+          if (!isV3) ctx.addIssue({ code: 'custom', path: [...path, key, 'rules', ruleIndex, 'source'], message: 'Las variables externas requieren schemaVersion 3' });
+          const variable = externalByName.get(source.variable);
+          if (!variable) {
+            ctx.addIssue({ code: 'custom', path: [...path, key, 'rules', ruleIndex, 'source'], message: `Variable externa no declarada: ${source.variable}` });
+            continue;
+          }
+          if (variable.trust === 'presentation' && owner !== 'textBlock') {
+            ctx.addIssue({ code: 'custom', path: [...path, key, 'rules', ruleIndex, 'source'], message: 'Las variables de presentación solo pueden controlar bloques informativos' });
+          }
+          const values = Array.isArray(rule.value) ? rule.value : [rule.value];
+          for (const value of values) {
+            if (value === undefined || ['empty', 'notEmpty'].includes(rule.operator)) continue;
+            const compatible = variable.type === 'string' ? typeof value === 'string' : variable.type === 'number' ? typeof value === 'number' && Number.isFinite(value) : typeof value === 'boolean';
+            if (!compatible) ctx.addIssue({ code: 'custom', path: [...path, key, 'rules', ruleIndex, 'value'], message: `El valor esperado no coincide con el tipo ${variable.type}` });
+          }
+          if (['greaterThan', 'greaterThanOrEqual', 'lessThan', 'lessThanOrEqual'].includes(rule.operator) && variable.type !== 'number') {
+            ctx.addIssue({ code: 'custom', path: [...path, key, 'rules', ruleIndex, 'operator'], message: 'Las comparaciones numéricas requieren una variable number' });
+          }
+        }
+      }
+    };
+    validateConditionGroups(definition.conditions ?? {}, ['conditions'], 'form', new Set(fieldIds));
+    definition.containers.forEach((container, containerIndex) => {
+      validateConditionGroups(container.conditions ?? {}, ['containers', containerIndex, 'conditions'], 'container', new Set(containerFields(container).map((field) => field.id)));
+      for (const [fieldIndex, field] of containerFields(container).entries()) {
+        validateConditionGroups(field.conditions ?? {}, ['containers', containerIndex, 'fields', fieldIndex, 'conditions'], 'field');
+      }
+      for (const [itemIndex, item] of containerItems(container).entries()) {
+        if (item.kind === 'textBlock') {
+          if (!isV3) ctx.addIssue({ code: 'custom', path: ['containers', containerIndex, 'items', itemIndex], message: 'Los bloques informativos requieren schemaVersion 3' });
+          for (const [key, value] of [['title', item.title], ['text', item.text]] as const) {
+            if (value !== undefined) {
+              const templateError = textTemplateError(value, externalByName.keys());
+              if (templateError) ctx.addIssue({ code: 'custom', path: ['containers', containerIndex, 'items', itemIndex, key], message: templateError });
+            }
+          }
+          validateConditionGroups(item.conditions ?? {}, ['containers', containerIndex, 'items', itemIndex, 'conditions'], 'textBlock');
+        }
+      }
     });
 
     const visiting = new Set<string>();
@@ -328,7 +522,11 @@ export const formDefinitionSchema = z
       const field = fieldsById.get(fieldId);
       if (!field) return;
       visiting.add(fieldId);
-      const dependencies = Object.values(field.conditions ?? {}).flatMap((group) => group?.rules.map((rule) => rule.fieldId) ?? []);
+      const dependencies = Object.values(field.conditions ?? {})
+        .flatMap((group) => conditionLeaves(group))
+        .map((rule) => sourceOf(rule))
+        .filter((source): source is { kind: 'field'; fieldId: string } => source?.kind === 'field')
+        .map((source) => source.fieldId);
       for (const dependency of dependencies) visit(dependency, [...path, fieldId]);
       visiting.delete(fieldId);
       visited.add(fieldId);
@@ -337,37 +535,34 @@ export const formDefinitionSchema = z
   });
 export type FormDefinition = z.infer<typeof formDefinitionSchema>;
 
+export { upgradeDefinitionToV2, upgradeDefinitionToV3 } from './migrations.js';
+
 /**
  * Upgrades a legacy definition when it enters the CMS. Published v1 versions
  * remain untouched; the next draft save becomes an explicit v2 definition
  * without changing the behavior of existing fields.
  */
-export function upgradeDefinitionToV2(definition: FormDefinition, tipificationKey = 'generic@v1'): FormDefinition {
-  if (definition.schemaVersion === 2) return definition;
-  return {
-    ...definition,
-    schemaVersion: 2,
-    tipificationKey: definition.tipificationKey ?? tipificationKey,
-    containers: definition.containers.map((container) => ({
-      ...container,
-      kind: container.kind ?? 'section',
-      fields: container.fields.map((field) => (
-        field.type === 'combobox' && field.allowCustomValue === undefined
-          ? { ...field, allowCustomValue: true }
-          : field
-      )),
-    })),
-  };
-}
-
 export const dynamicFormPropsSchema = z.object({
   formId: z.string().uuid(),
   apiBaseUrl: z.string().url(),
   mode: z.enum(['published', 'draft']).optional(),
+  externalVariables: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]).optional()).optional(),
+  contextToken: z.string().min(1).optional(),
 });
+export type DynamicFormPreviewState = {
+  visible: boolean;
+  enabled: boolean;
+  included: boolean;
+  payload: Record<string, FormValue>;
+};
 export type DynamicFormProps = z.infer<typeof dynamicFormPropsSchema> & {
   onSubmitted?: (receipt: SubmissionReceipt) => void;
   onError?: (error: FormRuntimeError) => void;
+  /**
+   * Optional local observation hook used by the CMS preview. It is never part
+   * of the serialized props contract and does not grant any server authority.
+   */
+  onPreviewStateChange?: (state: DynamicFormPreviewState) => void;
 };
 
 export const submissionEnvelopeSchema = z.object({
@@ -405,7 +600,7 @@ export type RuntimeFormResponse = z.infer<typeof runtimeFormResponseSchema>;
 export function flattenFields(definition: FormDefinition): FormField[] {
   return definition.containers
     .filter((container) => container.kind !== 'repeater')
-    .flatMap((container) => container.fields);
+    .flatMap((container) => containerFields(container));
 }
 
 export function repeaterContainers(definition: FormDefinition): FormContainer[] {
@@ -417,6 +612,12 @@ function isEmpty(value: unknown): boolean {
   if (typeof value === 'string' && value.trim() === '') return true;
   return Array.isArray(value) && value.length === 0;
 }
+
+export type ExternalVariableValues = Record<string, unknown>;
+export type ConditionValues = {
+  fields?: Record<string, unknown>;
+  external?: ExternalVariableValues;
+};
 
 function asBoolean(value: unknown): boolean | undefined {
   if (typeof value === 'boolean') return value;
@@ -438,8 +639,11 @@ function asFiniteNumber(value: unknown): number | undefined {
 }
 
 export function valuesEqual(actual: unknown, expected: unknown): boolean {
+  // Absence is intentionally not equal to an empty literal. Use the explicit
+  // `empty` operator when a rule should match undefined/null/blank values.
+  if (actual === undefined || actual === null) return false;
+  if (expected === undefined || expected === null) return false;
   if (Object.is(actual, expected)) return true;
-  if (isEmpty(actual) && isEmpty(expected)) return true;
   if (isEmpty(actual) || isEmpty(expected)) return false;
 
   const actualBoolean = asBoolean(actual);
@@ -463,53 +667,92 @@ export function valuesEqual(actual: unknown, expected: unknown): boolean {
   return false;
 }
 
-export function evaluateCondition(group: ConditionGroup | undefined, values: Record<string, unknown>): boolean {
+function sourceOf(rule: ConditionRule): ConditionSource | undefined {
+  if (rule.source) return rule.source;
+  if (rule.fieldId) return { kind: 'field', fieldId: rule.fieldId };
+  return undefined;
+}
+
+function evaluateRule(rule: ConditionRule, values: Record<string, unknown>, external: ExternalVariableValues): boolean {
+  const source = sourceOf(rule);
+  if (!source) return false;
+  const actual = source.kind === 'external' ? external[source.variable] : values[source.fieldId];
+  const expectedList = Array.isArray(rule.value) ? rule.value as unknown[] : undefined;
+  switch (rule.operator) {
+    case 'equals': return valuesEqual(actual, rule.value);
+    case 'notEquals': return actual === undefined || actual === null ? true : !valuesEqual(actual, rule.value);
+    case 'in':
+      return Boolean(expectedList) && (Array.isArray(actual)
+        ? actual.some((entry) => expectedList!.some((item) => valuesEqual(entry, item)))
+        : expectedList!.some((item) => valuesEqual(actual, item)));
+    case 'notIn':
+      return Boolean(expectedList) && (Array.isArray(actual)
+        ? actual.every((entry) => !expectedList!.some((item) => valuesEqual(entry, item)))
+        : actual === undefined || actual === null || !expectedList!.some((item) => valuesEqual(actual, item)));
+    case 'greaterThan': return asFiniteNumber(actual) !== undefined && asFiniteNumber(rule.value) !== undefined && asFiniteNumber(actual)! > asFiniteNumber(rule.value)!;
+    case 'greaterThanOrEqual': return asFiniteNumber(actual) !== undefined && asFiniteNumber(rule.value) !== undefined && asFiniteNumber(actual)! >= asFiniteNumber(rule.value)!;
+    case 'lessThan': return asFiniteNumber(actual) !== undefined && asFiniteNumber(rule.value) !== undefined && asFiniteNumber(actual)! < asFiniteNumber(rule.value)!;
+    case 'lessThanOrEqual': return asFiniteNumber(actual) !== undefined && asFiniteNumber(rule.value) !== undefined && asFiniteNumber(actual)! <= asFiniteNumber(rule.value)!;
+    case 'empty': return isEmpty(actual);
+    case 'notEmpty': return !isEmpty(actual);
+  }
+}
+
+export function evaluateCondition(group: ConditionGroup | undefined, values: Record<string, unknown>, external: ExternalVariableValues = {}): boolean {
   if (!group) return true;
-  const results = group.rules.map((rule) => {
-    const actual = values[rule.fieldId];
-    switch (rule.operator) {
-      case 'equals': return valuesEqual(actual, rule.value);
-      case 'notEquals': return !valuesEqual(actual, rule.value);
-      case 'in': return Array.isArray(rule.value) && rule.value.some((item) => valuesEqual(actual, item));
-      case 'notIn': return Array.isArray(rule.value) && !rule.value.some((item) => valuesEqual(actual, item));
-      case 'greaterThan': return Number(actual) > Number(rule.value);
-      case 'greaterThanOrEqual': return Number(actual) >= Number(rule.value);
-      case 'lessThan': return Number(actual) < Number(rule.value);
-      case 'lessThanOrEqual': return Number(actual) <= Number(rule.value);
-      case 'empty': return isEmpty(actual);
-      case 'notEmpty': return !isEmpty(actual);
-    }
-  });
+  const results = [
+    ...group.rules.map((rule) => evaluateRule(rule, values, external)),
+    ...(group.groups ?? []).map((child) => evaluateCondition(child, values, external)),
+  ];
   return group.logic === 'all' ? results.every(Boolean) : results.some(Boolean);
 }
 
-export function isFieldVisible(field: FormField, values: Record<string, unknown>): boolean {
-  return evaluateCondition(field.conditions?.visible, values);
+export function isElementVisible(conditions: ElementConditions | undefined, values: Record<string, unknown>, external: ExternalVariableValues = {}): boolean {
+  return evaluateCondition(conditions?.visible, values, external);
 }
 
-export function isFieldEnabled(field: FormField, values: Record<string, unknown>): boolean {
-  return evaluateCondition(field.conditions?.enabled, values);
+export function isElementEnabled(conditions: ElementConditions | undefined, values: Record<string, unknown>, external: ExternalVariableValues = {}): boolean {
+  return evaluateCondition(conditions?.enabled, values, external);
 }
 
-export function isFieldRequired(field: FormField, values: Record<string, unknown>): boolean {
-  return Boolean(field.rules.required) || evaluateCondition(field.conditions?.required, values) && Boolean(field.conditions?.required);
+export function isElementIncluded(conditions: ElementConditions | undefined, values: Record<string, unknown>, external: ExternalVariableValues = {}): boolean {
+  return evaluateCondition(conditions?.included, values, external);
 }
 
-export function cleanSubmissionPayload(definition: FormDefinition, payload: Record<string, unknown>): Record<string, FormValue> {
+export function isFieldVisible(field: FormField, values: Record<string, unknown>, external: ExternalVariableValues = {}): boolean {
+  return evaluateCondition(field.conditions?.visible, values, external);
+}
+
+export function isFieldEnabled(field: FormField, values: Record<string, unknown>, external: ExternalVariableValues = {}): boolean {
+  return evaluateCondition(field.conditions?.enabled, values, external);
+}
+
+export function isFieldIncluded(field: FormField, values: Record<string, unknown>, external: ExternalVariableValues = {}): boolean {
+  return evaluateCondition(field.conditions?.included, values, external);
+}
+
+export function isFieldRequired(field: FormField, values: Record<string, unknown>, external: ExternalVariableValues = {}): boolean {
+  return Boolean(field.rules.required) || Boolean(field.conditions?.required && evaluateCondition(field.conditions.required, values, external));
+}
+
+export function cleanSubmissionPayload(definition: FormDefinition, payload: Record<string, unknown>, external: ExternalVariableValues = {}): Record<string, FormValue> {
   const output: Record<string, FormValue> = {};
   const valuesById: Record<string, unknown> = {};
   for (const field of flattenFields(definition)) valuesById[field.id] = payload[field.fieldName];
-  for (const field of flattenFields(definition)) {
-    if (!isFieldVisible(field, valuesById) || !isFieldEnabled(field, valuesById)) continue;
-    const value = payload[field.fieldName];
-    if (value !== undefined && value !== null && value !== '') {
-      if (isFormValue(value)) output[field.fieldName] = value;
+  if (!isElementVisible(definition.conditions, valuesById, external) || !isElementIncluded(definition.conditions, valuesById, external) || !isElementEnabled(definition.conditions, valuesById, external)) return output;
+  for (const container of definition.containers) {
+    const containerVisible = isElementVisible(container.conditions, valuesById, external);
+    const containerIncluded = isElementIncluded(container.conditions, valuesById, external);
+    if (!containerVisible || !containerIncluded) continue;
+    if (container.kind === 'repeater') {
+      const value = container.fieldName ? payload[container.fieldName] : undefined;
+      if (value !== undefined && value !== null && value !== '' && isRepeaterValue(value) && container.fieldName) output[container.fieldName] = value;
+      continue;
     }
-  }
-  for (const container of repeaterContainers(definition)) {
-    const value = container.fieldName ? payload[container.fieldName] : undefined;
-    if (value !== undefined && value !== null && value !== '' && isRepeaterValue(value)) {
-      output[container.fieldName!] = value;
+    for (const field of containerFields(container)) {
+      if (!isFieldVisible(field, valuesById, external) || !isFieldIncluded(field, valuesById, external)) continue;
+      const value = payload[field.fieldName];
+      if (value !== undefined && value !== null && value !== '' && isFormValue(value)) output[field.fieldName] = value;
     }
   }
   return output;

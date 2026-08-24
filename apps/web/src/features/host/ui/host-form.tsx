@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { bffUrl } from '../../../shared/config/public-env';
 import { RemoteForm } from './remote-form';
 
-export function HostForm({ formId }: { formId: string }) {
+export function HostForm({ formId, externalVariables, contextToken }: { formId: string; externalVariables?: Record<string, string | number | boolean>; contextToken?: string }) {
   return (
     <div className="shell">
       <header className="topbar">
@@ -56,7 +56,7 @@ export function HostForm({ formId }: { formId: string }) {
         </section>
 
         <div style={{ maxWidth: 960, margin: '0 auto' }}>
-          <RemoteForm formId={formId} apiBaseUrl={bffUrl} />
+          <RemoteForm formId={formId} apiBaseUrl={bffUrl} externalVariables={externalVariables} contextToken={contextToken} />
         </div>
       </main>
     </div>

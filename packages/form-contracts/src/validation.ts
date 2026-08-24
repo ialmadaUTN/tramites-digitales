@@ -7,10 +7,17 @@ import {
   FormField,
   FormOption,
   FormValue,
+  ExternalVariableValues,
+  isElementIncluded,
+  isElementEnabled,
+  isElementVisible,
   isFieldEnabled,
+  isFieldIncluded,
   isFieldReadOnly,
   isFieldRequired,
   isFieldVisible,
+  containerFields,
+  cleanSubmissionPayload,
   isRepeaterValue,
   isUploadReference,
   maskKindSchema,
@@ -20,6 +27,28 @@ import {
 } from './index.js';
 
 export type ValidationResult = { success: true; data: Record<string, FormValue> } | { success: false; errors: Record<string, string> };
+
+export function validateExternalVariableValues(
+  definition: FormDefinition,
+  values: ExternalVariableValues | undefined,
+): { success: true; data: ExternalVariableValues } | { success: false; errors: Record<string, string> } {
+  const input = values ?? {};
+  const declared = definition.externalVariables ?? [];
+  const data: ExternalVariableValues = {};
+  const errors: Record<string, string> = {};
+  for (const variable of declared) {
+    const value = input[variable.name];
+    if (value === undefined || value === null) continue;
+    const valid = variable.type === 'string'
+      ? typeof value === 'string'
+      : variable.type === 'number'
+        ? typeof value === 'number' && Number.isFinite(value)
+        : typeof value === 'boolean';
+    if (!valid) errors[variable.name] = `La variable externa ${variable.name} debe ser de tipo ${variable.type}`;
+    else data[variable.name] = value;
+  }
+  return Object.keys(errors).length ? { success: false, errors } : { success: true, data };
+}
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const DEFAULT_ALLOWED_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/png'] as const;
@@ -181,7 +210,7 @@ function validateFieldValue(field: FormField, value: unknown, ctx: z.RefinementC
   }
 }
 
-function validateRepeater(container: FormContainer, value: unknown, ctx: z.RefinementCtx) {
+function validateRepeater(container: FormContainer, value: unknown, ctx: z.RefinementCtx, external: ExternalVariableValues) {
   const path = [container.fieldName ?? container.id];
   if (!Array.isArray(value) || !isRepeaterValue(value)) {
     ctx.addIssue({ code: 'custom', path, message: 'La grilla debe contener filas válidas' });
@@ -192,7 +221,7 @@ function validateRepeater(container: FormContainer, value: unknown, ctx: z.Refin
   if (value.length < minRows) ctx.addIssue({ code: 'custom', path, message: `Agregá al menos ${minRows} fila(s)` });
   if (value.length > maxRows) ctx.addIssue({ code: 'custom', path, message: `Podés agregar hasta ${maxRows} fila(s)` });
   value.forEach((row, rowIndex) => {
-    container.fields.forEach((field) => {
+    containerFields(container).forEach((field) => {
       const fieldValue = row[field.fieldName];
       const fieldPath = [...path, rowIndex, field.fieldName];
       if (field.rules.required && empty(fieldValue)) {
@@ -222,19 +251,19 @@ function overrideReadOnlyCells(fields: FormField[], row: Record<string, unknown>
 export function applyReadOnlyDefaults(definition: FormDefinition, payload: Record<string, unknown>): Record<string, unknown> {
   const next = overrideReadOnlyCells(flattenFields(definition), payload);
   for (const container of repeaterContainers(definition)) {
-    const readOnlyCells = container.fields.filter(isFieldReadOnly);
+    const readOnlyCells = containerFields(container).filter(isFieldReadOnly);
     const rows = container.fieldName ? next[container.fieldName] : undefined;
     if (!container.fieldName || readOnlyCells.length === 0 || !Array.isArray(rows)) continue;
     next[container.fieldName] = rows.map((row) =>
       row && typeof row === 'object' && !Array.isArray(row)
-        ? overrideReadOnlyCells(container.fields, row as Record<string, unknown>)
+        ? overrideReadOnlyCells(containerFields(container), row as Record<string, unknown>)
         : row,
     );
   }
   return next;
 }
 
-export function buildSubmissionSchema(definition: FormDefinition) {
+export function buildSubmissionSchema(definition: FormDefinition, external: ExternalVariableValues = {}) {
   const shape: Record<string, z.ZodTypeAny> = {};
   for (const field of flattenFields(definition)) shape[field.fieldName] = z.unknown().optional();
   for (const container of repeaterContainers(definition)) {
@@ -243,19 +272,28 @@ export function buildSubmissionSchema(definition: FormDefinition) {
   return z.object(shape).strict().superRefine((values, ctx) => {
     const byId: Record<string, unknown> = {};
     for (const field of flattenFields(definition)) byId[field.id] = values[field.fieldName];
+    if (!isElementVisible(definition.conditions, byId, external) || !isElementIncluded(definition.conditions, byId, external)) return;
+    if (!isElementEnabled(definition.conditions, byId, external)) {
+      ctx.addIssue({ code: 'custom', path: ['_form'], message: 'El formulario está deshabilitado' });
+      return;
+    }
     for (const field of flattenFields(definition)) {
       const value = values[field.fieldName];
-      if (!isFieldVisible(field, byId) || !isFieldEnabled(field, byId)) continue;
-      if (isFieldRequired(field, byId) && empty(value)) {
+      const container = definition.containers.find((candidate) => containerFields(candidate).some((candidateField) => candidateField.id === field.id));
+      if (!container || !isElementVisible(container.conditions, byId, external) || !isElementIncluded(container.conditions, byId, external)) continue;
+      if (!isFieldVisible(field, byId, external) || !isFieldIncluded(field, byId, external)) continue;
+      const enabled = isFieldEnabled(field, byId, external) && isElementEnabled(container.conditions, byId, external);
+      if (enabled && isFieldRequired(field, byId, external) && empty(value)) {
         ctx.addIssue({ code: 'custom', path: [field.fieldName], message: message(field, 'required', 'Este campo es obligatorio') });
         continue;
       }
       if (!empty(value)) validateFieldValue(field, value, ctx, [field.fieldName]);
     }
     for (const container of repeaterContainers(definition)) {
+      if (!isElementVisible(container.conditions, byId, external) || !isElementIncluded(container.conditions, byId, external)) continue;
       if (container.fieldName && values[container.fieldName] !== undefined && !empty(values[container.fieldName])) {
-        validateRepeater(container, values[container.fieldName], ctx);
-      } else if (container.minRows && container.minRows > 0) {
+        validateRepeater(container, values[container.fieldName], ctx, external);
+      } else if (isElementEnabled(container.conditions, byId, external) && container.minRows && container.minRows > 0) {
         ctx.addIssue({ code: 'custom', path: [container.fieldName ?? container.id], message: `Agregá al menos ${container.minRows} fila(s)` });
       }
     }
@@ -282,7 +320,7 @@ function normalizeRepeaterValue(container: FormContainer, value: unknown): FormV
   if (!Array.isArray(value)) return undefined;
   return value.map((row) => {
     const normalized: Record<string, string | number | boolean> = {};
-    for (const field of container.fields) {
+    for (const field of containerFields(container)) {
       const fieldValue = normalizeFieldValue(field, row[field.fieldName]);
       if (fieldValue !== undefined && !Array.isArray(fieldValue)) normalized[field.fieldName] = fieldValue;
     }
@@ -290,8 +328,10 @@ function normalizeRepeaterValue(container: FormContainer, value: unknown): FormV
   });
 }
 
-export function validateSubmission(definition: FormDefinition, payload: Record<string, unknown>): ValidationResult {
-  const parsed = buildSubmissionSchema(definition).safeParse(applyReadOnlyDefaults(definition, payload));
+export function validateSubmission(definition: FormDefinition, payload: Record<string, unknown>, external: ExternalVariableValues = {}): ValidationResult {
+  const externalResult = validateExternalVariableValues(definition, external);
+  if (!externalResult.success) return externalResult;
+  const parsed = buildSubmissionSchema(definition, externalResult.data).safeParse(applyReadOnlyDefaults(definition, payload));
   if (!parsed.success) {
     const errors: Record<string, string> = {};
     for (const issue of parsed.error.issues) {
@@ -310,5 +350,8 @@ export function validateSubmission(definition: FormDefinition, payload: Record<s
     const normalized = normalizeRepeaterValue(container, parsed.data[container.fieldName]);
     if (normalized !== undefined) data[container.fieldName] = normalized;
   }
-  return { success: true, data };
+  // Apply the same effective visibility/inclusion hierarchy used by the BFF.
+  // This keeps hidden or excluded values out of the browser submission too;
+  // disabled fields deliberately remain because their existing value is valid.
+  return { success: true, data: cleanSubmissionPayload(definition, data, externalResult.data) };
 }
