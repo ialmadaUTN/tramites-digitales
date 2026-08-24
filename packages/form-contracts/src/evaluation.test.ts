@@ -4,7 +4,6 @@ import {
   evaluateCondition,
   formDefinitionSchema,
   isFormValue,
-  isFieldEffectivelyRequired,
   isRepeaterRow,
   isUploadReference,
   type ConditionOperator,
@@ -29,6 +28,7 @@ describe('operadores de condición', () => {
   const cases: [operator: ConditionOperator, expected: unknown, actual: unknown, result: boolean][] = [
     ['equals', 'si', 'si', true],
     ['equals', 'si', 'no', false],
+    ['equals', null, null, false],
     ['notEquals', 'si', 'no', true],
     ['notEquals', 'si', 'si', false],
     ['in', ['a', 'b'], 'b', true],
@@ -210,9 +210,11 @@ describe('obligatoriedad efectiva: visible, oculto, habilitado, deshabilitado', 
 
   /** `target` depende de `gate === 'si'` para la dimensión que se esté probando. */
   function build(overrides: Record<string, unknown>) {
+    // v3: la inclusión condicional es una de las dimensiones que se recorren.
     return formDefinitionSchema.parse({
-      schemaVersion: 2,
+      schemaVersion: 3,
       tipificationKey: 'generic@v1',
+      externalVariables: [],
       title: 'Obligatoriedad',
       submitLabel: 'Enviar',
       containers: [{
@@ -250,6 +252,10 @@ describe('obligatoriedad efectiva: visible, oculto, habilitado, deshabilitado', 
       gate: 'si',
       exigido: false,
     },
+
+    // Inclusión: un campo excluido del payload tampoco se exige, aunque se vea.
+    { name: 'fijo · incluido', definition: build({ rules: { required: true }, conditions: { included: shows } }), gate: 'si', exigido: true },
+    { name: 'fijo · excluido', definition: build({ rules: { required: true }, conditions: { included: shows } }), gate: 'no', exigido: false },
   ];
 
   it.each(cases)('$name → exigido=$exigido', ({ definition, gate: gateValue, exigido }) => {
@@ -258,13 +264,9 @@ describe('obligatoriedad efectiva: visible, oculto, habilitado, deshabilitado', 
     expect(falla).toBe(exigido);
   });
 
-  it.each(cases)('$name · el helper coincide con el validador', ({ definition, gate: gateValue, exigido }) => {
-    // Contrato y runtime tienen que leer lo mismo: el asterisco que ve el usuario
-    // debe significar exactamente lo que el servidor va a exigir.
-    const parsed = definition as { containers: { fields: FormField[] }[] };
-    const target = parsed.containers[0]!.fields.find((f) => f.id === 'target')!;
-    expect(isFieldEffectivelyRequired(target, { gate: gateValue })).toBe(exigido);
-  });
+  // El lado del runtime —que el asterisco coincida con lo que el validador
+  // exige— se cubre en `dynamic-field`, que es donde se arma ese criterio:
+  // apps/form-remote/src/features/runtime/ui/fields/required-marker.test.tsx
 
   it('un campo oculto y obligatorio no viaja en el payload', () => {
     const definition = build({ rules: { required: true }, conditions: { visible: shows } });

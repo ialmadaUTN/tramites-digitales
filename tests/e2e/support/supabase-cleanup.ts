@@ -8,6 +8,7 @@ type CleanupConfig = {
 };
 
 type FormRow = { id: number };
+type SubmissionRow = { payload: Record<string, unknown> };
 
 function readWorkspaceEnv() {
   const values: Record<string, string> = {};
@@ -103,4 +104,25 @@ export async function deleteE2eForm(publicId: string) {
     { method: 'DELETE', headers: headers(config, 'content') },
   );
   await assertResponse(deleteResponse, `No se pudo borrar el formulario ${publicId}`);
+}
+
+/** Lee la última submission de un formulario de prueba para afirmar el payload limpio. */
+export async function latestE2eSubmissionPayload(publicId: string): Promise<Record<string, unknown>> {
+  const config = getConfig();
+  const formResponse = await fetch(
+    `${config.url}/rest/v1/forms?select=id&public_id=eq.${encodeURIComponent(publicId)}`,
+    { headers: headers(config, 'accept') },
+  );
+  await assertResponse(formResponse, `No se pudo buscar el formulario ${publicId}`);
+  const forms = await formResponse.json() as FormRow[];
+  const form = forms[0];
+  if (!form) throw new Error(`No se encontró el formulario ${publicId}`);
+  const submissionsResponse = await fetch(
+    `${config.url}/rest/v1/submissions?form_id=eq.${form.id}&select=payload&order=created_at.desc&limit=1`,
+    { headers: headers(config, 'accept') },
+  );
+  await assertResponse(submissionsResponse, `No se pudo leer la submission del formulario ${publicId}`);
+  const submissions = await submissionsResponse.json() as SubmissionRow[];
+  if (!submissions[0]) throw new Error(`No se encontró una submission para ${publicId}`);
+  return submissions[0].payload;
 }

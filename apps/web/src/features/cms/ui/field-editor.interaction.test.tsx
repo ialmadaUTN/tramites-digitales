@@ -184,7 +184,7 @@ describe('FieldEditor — qué definición produce', () => {
     await editor.user.click(screen.getByLabelText('Visibilidad condicional'));
 
     expect(editor.field.conditions?.visible?.logic).toBe('all');
-    expect(editor.field.conditions?.visible?.rules[0]?.fieldId).toBe('other');
+    expect(editor.field.conditions?.visible?.rules[0]?.source).toEqual({ kind: 'field', fieldId: 'other' });
   });
 });
 
@@ -193,12 +193,12 @@ describe('ConditionEditor — qué condición produce', () => {
     field({ id: 'source', fieldName: 'origen', label: 'Origen', type: 'select', options: [{ label: 'Sí', value: 'si' }, { label: 'No', value: 'no' }] }),
   ];
 
-  function renderCondition(initial: Parameters<typeof ConditionEditor>[0]['condition']) {
+  function renderCondition(initial: Parameters<typeof ConditionEditor>[0]['condition'], externalVariables: Parameters<typeof ConditionEditor>[0]['externalVariables'] = []) {
     let current = initial!;
     function Harness() {
       const [condition, setCondition] = useState(current);
       current = condition;
-      return <ConditionEditor label="Visibilidad" condition={condition} otherFields={candidates} onChange={setCondition} />;
+      return <ConditionEditor label="Visibilidad" condition={condition} otherFields={candidates} externalVariables={externalVariables} onChange={setCondition} />;
     }
     render(<Harness />);
     return { user: userEvent.setup(), get condition() { return current; } };
@@ -244,5 +244,35 @@ describe('ConditionEditor — qué condición produce', () => {
     await editor.user.selectOptions(fieldSelect, 'source');
 
     expect(editor.condition.rules[0]?.value).toBe('');
+  });
+
+  it('selecciona una variable externa como origen', async () => {
+    const editor = renderCondition({ logic: 'all', rules: [{ fieldId: 'source', operator: 'equals', value: 'si' }] }, [{ name: 'insuranceCode', label: 'Código de seguro', type: 'string', trust: 'trusted' }]);
+    const fieldSelect = within(document.querySelector('.condition-rule')!).getAllByRole('combobox')[0]!;
+    await editor.user.selectOptions(fieldSelect, 'external:insuranceCode');
+    expect(editor.condition.rules[0]?.source).toEqual({ kind: 'external', variable: 'insuranceCode' });
+    expect(editor.condition.rules[0]?.fieldId).toBeUndefined();
+  });
+
+  it('usa controles tipados para variables externas numéricas y booleanas', async () => {
+    const numberEditor = renderCondition({ logic: 'all', rules: [{ fieldId: 'source', operator: 'equals', value: '' }] }, [{ name: 'count', label: 'Cantidad', type: 'number', trust: 'trusted' }]);
+    await numberEditor.user.selectOptions(within(document.querySelector('.condition-rule')!).getAllByRole('combobox')[0]!, 'external:count');
+    const numberInput = document.querySelector('.condition-rule input') as HTMLInputElement;
+    await numberEditor.user.type(numberInput, '12');
+    expect(numberEditor.condition.rules[0]?.value).toBe(12);
+    cleanup();
+    const booleanEditor = renderCondition({ logic: 'all', rules: [{ source: { kind: 'external', variable: 'active' }, operator: 'equals', value: '' }] }, [{ name: 'active', label: 'Activo', type: 'boolean', trust: 'trusted' }]);
+    await booleanEditor.user.selectOptions(within(document.querySelector('.condition-rule')!).getAllByRole('combobox')[2]!, 'true');
+    expect(booleanEditor.condition.rules[0]?.value).toBe(true);
+  });
+
+  it('agrega un grupo anidado y permite cambiar su lógica', async () => {
+    const editor = renderCondition({ logic: 'all', rules: [{ fieldId: 'source', operator: 'notEmpty' }] });
+    await editor.user.click(screen.getByRole('button', { name: '+ Agregar grupo anidado' }));
+    expect(editor.condition.groups).toHaveLength(1);
+    const nested = document.querySelectorAll('.condition-group-nested')[0] as HTMLElement;
+    const logic = within(nested).getAllByRole('combobox')[0]!;
+    await editor.user.selectOptions(logic, 'any');
+    expect(editor.condition.groups?.[0]?.logic).toBe('any');
   });
 });

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { deleteE2eForm } from './support/supabase-cleanup';
+import { deleteE2eForm, latestE2eSubmissionPayload } from './support/supabase-cleanup';
 
 /**
  * Recorrido completo de autoría: armar un formulario en el CMS, publicarlo y
@@ -61,13 +61,29 @@ test('un formulario creado en el CMS se publica y se completa en el host', async
   await nombre.locator('.form-group').filter({ hasText: 'Etiqueta visible (Label)' }).locator('input').fill('Nombre completo');
   await nombre.getByLabel('Obligatorio').check();
 
+  // --- Contexto externo y bloque informativo ------------------------------
+  await page.getByRole('button', { name: /Agregar variable externa/ }).click();
+  await page.getByRole('button', { name: /Agregar variable externa/ }).click();
+  const trustedVariable = page.locator('.form-group').filter({ hasText: 'variable2' }).first();
+  await trustedVariable.locator('select').nth(1).selectOption('trusted');
+  await page.getByRole('button', { name: /Agregar bloque informativo/ }).first().click();
+  const contextualBlock = fieldEditor(page, 1);
+  await contextualBlock.locator('.form-group').filter({ hasText: 'Título' }).locator('input').fill('Información contextual');
+  await contextualBlock.locator('.form-group').filter({ hasText: 'Contenido' }).locator('textarea').fill('Cliente: {{variable2}}');
+  await contextualBlock.getByLabel('Visibilidad condicional').check();
+  await contextualBlock.locator('.condition-rule').locator('select').first().selectOption('external:variable1');
+  await contextualBlock.locator('.condition-rule').locator('input').fill('2050');
+
   // --- Campo 2: solo lectura con valor fijo --------------------------------
   await page.getByRole('button', { name: /Agregar Campo a este Contenedor/ }).first().click();
-  const sucursal = fieldEditor(page, 1);
+  const sucursal = fieldEditor(page, 2);
   await sucursal.locator('.form-group').filter({ hasText: 'Etiqueta visible (Label)' }).locator('input').fill('Sucursal');
   await sucursal.locator('.form-group').filter({ hasText: 'Nombre de clave de payload' }).locator('input').fill('sucursal');
   await sucursal.locator('.form-group').filter({ hasText: 'Valor inicial por defecto' }).locator('input').fill('Centro');
   await sucursal.getByLabel('Solo lectura').check();
+  await sucursal.getByLabel('Inclusión condicional').check();
+  await sucursal.locator('.condition-rule').locator('select').first().selectOption('external:variable2');
+  await sucursal.locator('.condition-rule').locator('input').fill('9999');
 
   // El editor no debería estar reportando ningún problema antes de guardar.
   await expect(page.locator('.field-error')).toHaveCount(0);
@@ -82,6 +98,8 @@ test('un formulario creado en el CMS se publica y se completa en el host', async
   // --- Completar en el host federado ---------------------------------------
   await page.goto(hostHref!);
   await expect(page.getByRole('heading', { name: 'Solicitud de prueba' })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText('Información contextual')).toBeVisible();
+  await expect(page.getByText('Cliente: 2050')).toBeVisible();
 
   // El campo de solo lectura llega con su valor y no se puede editar.
   const readOnlyInput = page.getByLabel(/Sucursal/);
@@ -99,4 +117,7 @@ test('un formulario creado en el CMS se publica y se completa en el host', async
 
   await expect(page.getByText('Gestión recibida')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(/Número de submission:/)).toBeVisible();
+  const payload = await latestE2eSubmissionPayload(createdFormId!);
+  expect(payload).toMatchObject({ name: 'Ana Pérez' });
+  expect(payload).not.toHaveProperty('sucursal');
 });

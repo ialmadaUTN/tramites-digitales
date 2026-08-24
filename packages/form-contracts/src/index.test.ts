@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FIELD_NAME_INVALID_MESSAGE, fieldNameError } from './field-name';
-import { cleanSubmissionPayload, evaluateCondition, optionSchema, upgradeDefinitionToV2, validateDefinition } from './index';
+import { cleanSubmissionPayload, evaluateCondition, formDefinitionSchema, optionSchema, upgradeDefinitionToV2, validateDefinition } from './index';
 import { applyReadOnlyDefaults, validateFieldDefaultValue, validateSubmission } from './validation';
 
 const definition = validateDefinition({
@@ -16,6 +16,23 @@ describe('form contracts', () => {
   it('evaluates conditions and cleans inactive fields', () => {
     expect(evaluateCondition({ logic: 'all', rules: [{ fieldId: 'choice', operator: 'equals', value: 'yes' }] }, { choice: 'yes' })).toBe(true);
     expect(cleanSubmissionPayload(definition, { choice: 'no', detail: 'should be removed' })).toEqual({ choice: 'no' });
+  });
+
+  it('valida plantillas de bloques contra el catálogo externo', () => {
+    const base = {
+      schemaVersion: 3 as const,
+      tipificationKey: 'generic@v1',
+      externalVariables: [{ name: 'customerName', label: 'Cliente', type: 'string' as const, trust: 'presentation' as const }],
+      title: 'Demo',
+      submitLabel: 'Enviar',
+      containers: [{ id: 'c1', title: 'Datos', fields: [], items: [{ id: 'info', kind: 'textBlock' as const, title: 'Nombre', text: 'Cliente: {{ customerName }}' }] }],
+    };
+    const baseContainer = base.containers[0]!;
+    const baseInfo = baseContainer.items![0]!;
+    expect(formDefinitionSchema.parse(base).containers[0]?.items?.[0]).toMatchObject({ kind: 'textBlock' });
+    expect(cleanSubmissionPayload(formDefinitionSchema.parse(base), {})).toEqual({});
+    expect(() => formDefinitionSchema.parse({ ...base, containers: [{ ...baseContainer, items: [{ ...baseInfo, text: '{{missing}}' }] }] })).toThrow(/no declarada/);
+    expect(() => formDefinitionSchema.parse({ ...base, containers: [{ ...baseContainer, items: [{ ...baseInfo, title: '{{' }] }] })).toThrow(/abierta/);
   });
 
   it('compares equals and notEquals across numbers and trimmed text', () => {

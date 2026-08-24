@@ -19,11 +19,11 @@ afterEach(cleanup);
 const gate: FormField = { id: 'gate', fieldName: 'gate', type: 'text', label: 'Gate', width: 'full', rules: {} };
 const pointsAtGate = { logic: 'all' as const, rules: [{ fieldId: 'gate', operator: 'equals' as const, value: 'si' }] };
 
-function Harness({ target, values }: { target: FormField; values: FormValues }) {
+function Harness({ target, values, ancestorEnabled = true }: { target: FormField; values: FormValues; ancestorEnabled?: boolean }) {
   const { control } = useForm<FormValues>({ defaultValues: values });
   const fieldMap = new Map([[gate.id, gate], [target.id, target]]);
   return (
-    <DynamicField field={target} control={control} values={values} errors={{}} fieldMap={fieldMap} />
+    <DynamicField field={target} control={control} values={values} errors={{}} fieldMap={fieldMap} ancestorEnabled={ancestorEnabled} />
   );
 }
 
@@ -52,11 +52,29 @@ describe('marca de obligatorio en el runtime', () => {
     // Condicional pura.
     { name: 'condicional cumplida', field: target({ conditions: { required: pointsAtGate } }), gate: 'si', marca: true },
     { name: 'condicional incumplida', field: target({ conditions: { required: pointsAtGate } }), gate: 'no', marca: false },
+
+    // Inclusión: un campo excluido del payload no se exige aunque se vea.
+    { name: 'fijo e incluido', field: target({ rules: { required: true }, conditions: { included: pointsAtGate } }), gate: 'si', marca: true },
+    { name: 'fijo y excluido', field: target({ rules: { required: true }, conditions: { included: pointsAtGate } }), gate: 'no', marca: false },
   ];
 
   it.each(cases)('$name → marca=$marca', ({ field, gate: gateValue, marca }) => {
     render(<Harness target={field} values={{ gate: gateValue, target: '' }} />);
     expect(hasMarker()).toBe(marca);
+  });
+
+  it('el contenedor que envuelve al campo también cuenta', () => {
+    // La obligatoriedad efectiva incluye las condiciones de los ancestros: si la
+    // sección está deshabilitada, el servidor no exige el campo y el asterisco
+    // no puede prometer lo contrario.
+    render(
+      <Harness
+        target={target({ rules: { required: true } })}
+        values={{ gate: 'si', target: '' }}
+        ancestorEnabled={false}
+      />,
+    );
+    expect(hasMarker()).toBe(false);
   });
 
   it('un campo oculto no se renderiza en absoluto', () => {
