@@ -1,15 +1,34 @@
 'use client';
 
+import { useCallback, useEffect, useState } from 'react';
+import type { DynamicFormPreviewState } from '@tramites/form-contracts';
 import { bffUrl } from '../../../shared/config/public-env';
 import { RemoteForm } from '../../host/ui/remote-form';
 import { useCmsWorkspace } from '../hooks/use-cms-workspace';
 import { CmsShell } from './cms-shell';
 import { DefinitionEditor } from './definition-editor';
 import { FormList } from './form-list';
+import { PreviewContextPanel } from './preview-context-panel';
 import { WorkspaceHeader } from './workspace-header';
 
 export function CmsApp() {
   const workspace = useCmsWorkspace();
+  const [previewExternalVariables, setPreviewExternalVariables] = useState<Record<string, string | number | boolean | undefined>>({});
+  const [previewState, setPreviewState] = useState<DynamicFormPreviewState>();
+
+  useEffect(() => {
+    setPreviewExternalVariables({});
+    setPreviewState(undefined);
+  }, [workspace.selectedId]);
+
+  const handlePreviewVariableChange = useCallback((name: string, value: string | number | boolean | undefined) => {
+    setPreviewExternalVariables((current) => {
+      const next = { ...current };
+      if (value === undefined) delete next[name];
+      else next[name] = value;
+      return next;
+    });
+  }, []);
 
   return (
     <CmsShell selectedId={workspace.selectedId}>
@@ -75,7 +94,24 @@ export function CmsApp() {
                       </h3>
                       <span className="badge badge-info">Modo Borrador</span>
                     </div>
-                    <RemoteForm formId={workspace.selectedId} apiBaseUrl={bffUrl} mode="draft" />
+                    <div className="preview-workspace">
+                      <PreviewContextPanel
+                        variables={workspace.definition.externalVariables}
+                        values={previewExternalVariables}
+                        state={previewState}
+                        onChange={handlePreviewVariableChange}
+                        onReset={() => setPreviewExternalVariables({})}
+                      />
+                      <div className="preview-stage">
+                        <RemoteForm
+                          formId={workspace.selectedId}
+                          apiBaseUrl={bffUrl}
+                          mode="draft"
+                          externalVariables={previewExternalVariables}
+                          onPreviewStateChange={setPreviewState}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               ) : (

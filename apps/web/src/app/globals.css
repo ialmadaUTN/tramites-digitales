@@ -408,6 +408,12 @@ button, input, textarea, select {
   border: 1px solid var(--danger-border);
 }
 
+.badge-muted {
+  background: var(--soft);
+  color: var(--ink-muted);
+  border: 1px solid var(--line);
+}
+
 .badge-dot {
   width: 5px;
   height: 5px;
@@ -597,7 +603,59 @@ button, input, textarea, select {
   grid-column: 1 / -1;
 }
 
-.form-group label {
+.external-variable-catalog {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.external-variable-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.external-variable-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(130px, 1fr) minmax(170px, 1.2fr) auto;
+  align-items: end;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--soft);
+}
+
+.external-variable-row > * {
+  min-width: 0;
+}
+
+.external-variable-label,
+.external-variable-control {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.external-variable-remove {
+  align-self: end;
+  white-space: nowrap;
+}
+
+.external-variable-add {
+  margin-top: 12px;
+  min-width: 260px;
+}
+
+.form-group label,
+.external-variable-catalog > label {
   font-size: 12.5px;
   color: var(--ink-muted);
   font-weight: 700;
@@ -1132,6 +1190,181 @@ button, input, textarea, select {
   gap: 8px;
 }
 
+.preview-workspace {
+  display: grid;
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.preview-stage {
+  min-width: 0;
+}
+
+.preview-context-panel {
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.preview-context-header,
+.preview-context-field-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.preview-context-header h3 {
+  margin: 2px 0 0;
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.preview-context-header .button {
+  padding: 6px 9px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.preview-context-panel .hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.preview-context-empty {
+  margin: 0;
+  padding: 10px;
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.preview-context-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.preview-context-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.preview-context-field label:not(.preview-context-checkbox) {
+  min-width: 0;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.preview-context-field label code {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-light);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.preview-context-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.preview-context-field input[type="text"],
+.preview-context-field input[type="number"] {
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.preview-context-field input:focus {
+  outline: 2px solid var(--accent-light);
+  border-color: var(--accent);
+}
+
+.preview-context-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.preview-context-checkbox input {
+  width: 15px;
+  height: 15px;
+}
+
+.preview-context-type {
+  color: var(--ink-light);
+  font-size: 11px;
+}
+
+.preview-context-details {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.preview-context-details summary {
+  cursor: pointer;
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.preview-context-details pre {
+  max-height: 140px;
+  overflow: auto;
+  margin: 8px 0 0;
+  padding: 9px;
+  border-radius: 6px;
+  background: var(--soft);
+  color: var(--ink);
+  font-size: 10px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.preview-context-state {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.preview-context-state-title {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.preview-context-status-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
 /* Empty State */
 .empty-state {
   text-align: center;
@@ -1176,6 +1409,14 @@ button, input, textarea, select {
     position: static;
     max-height: none;
   }
+
+  .preview-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-context-panel {
+    position: static;
+  }
 }
 
 @media (max-width: 768px) {
@@ -1202,6 +1443,18 @@ button, input, textarea, select {
 
   .form-group.full {
     grid-column: auto;
+  }
+
+  .external-variable-row {
+    grid-template-columns: 1fr;
+  }
+
+  .external-variable-catalog {
+    grid-column: auto;
+  }
+
+  .external-variable-add {
+    width: 100%;
   }
 
   .toolbar {

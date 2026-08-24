@@ -31,14 +31,18 @@ export type StructuralIssue = {
 /**
  * Qué cuenta como contenido válido de un contenedor.
  *
- * Hoy solo hay campos de entrada, así que "tener contenido" es "tener al menos
- * un campo". Cuando existan componentes informativos (FAQ, textos de ayuda),
- * un contenedor que solo los tenga **se considera válido** y esta función es el
- * único lugar que hay que tocar: la decisión ya está tomada, no hay que volver
- * a discutirla.
+ * Se mira `items`, no `fields`: en v3 una sección guarda campos y bloques
+ * informativos mezclados en `items`, y `fields` quedó como proyección legacy.
+ * Una sección con **solo bloques informativos** es contenido válido y se puede
+ * publicar — la decisión estaba tomada desde antes de que los bloques
+ * existieran, y esta función es el único lugar que la aplica.
+ *
+ * Es la misma proyección que `containerItems` de `field-rules`, replicada acá
+ * en dos líneas: importarla obligaría a resolver un especificador `.js`
+ * relativo, que es justo lo que Turbopack no resuelve en el CMS.
  */
 function hasContent(container: FormContainer): boolean {
-  return container.fields.length > 0;
+  return (container.items ?? container.fields).length > 0;
 }
 
 export function structuralIssues(definition: FormDefinition): StructuralIssue[] {
@@ -61,8 +65,4 @@ export function structuralIssues(definition: FormDefinition): StructuralIssue[] 
   });
 
   return issues;
-}
-
-export function isPublishable(definition: FormDefinition): boolean {
-  return structuralIssues(definition).length === 0;
 }

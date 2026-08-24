@@ -87,6 +87,23 @@ describe('rechazo de definiciones inválidas', () => {
     expect(definitionErrors(rawDefinition(target))).toMatch(expected);
   });
 
+  const textBlockCases: [name: string, block: Record<string, unknown>, expected: RegExp][] = [
+    ['contenido informativo vacío', { id: 'info', kind: 'textBlock', text: '   ' }, /contenido del bloque no puede estar vacío/],
+    ['plantilla con variable no declarada', { id: 'info', kind: 'textBlock', text: '{{customerName}}' }, /variable externa no declarada/],
+    ['plantilla malformada', { id: 'info', kind: 'textBlock', text: '{{customerName' }, /variable queda abierta/],
+  ];
+
+  it.each(textBlockCases)('rechaza %s', (_name, block, expected) => {
+    expect(definitionErrors({
+      schemaVersion: 3,
+      tipificationKey: 'generic@v1',
+      externalVariables: [],
+      title: 'Reglas',
+      submitLabel: 'Enviar',
+      containers: [{ id: 'c1', title: 'Uno', kind: 'section', columns: 1, fields: [], items: [block] }],
+    })).toMatch(expected);
+  });
+
   it('acepta una definición que cumple todas las reglas', () => {
     expect(definitionErrors(rawDefinition({ type: 'text', rules: { minLength: 2, maxLength: 8, pattern: '^[a-z]+$' } }))).toBe('');
   });
@@ -262,5 +279,50 @@ describe('completitud estructural: base acepta, publicable rechaza', () => {
     const result = publishableFormDefinitionSchema.safeParse({ ...base, containers: [] });
     expect(result.error!.issues).toHaveLength(1);
     expect(result.error!.issues[0]!.path).toEqual(['containers']);
+  });
+});
+
+/**
+ * Completitud estructural frente a v3: una sección guarda campos y bloques
+ * informativos mezclados en `items`, y `fields` quedó como proyección legacy.
+ */
+describe('completitud estructural con bloques informativos (v3)', () => {
+  const v3 = { schemaVersion: 3 as const, tipificationKey: 'generic@v1', title: 'T', submitLabel: 'Enviar', externalVariables: [] };
+  const block = { id: 'b1', kind: 'textBlock' as const, text: 'Leé esto antes de empezar' };
+  const fieldItem = { kind: 'field' as const, field: { id: 'f1', fieldName: 'campo', type: 'text' as const, label: 'Campo', width: 'full' as const, rules: {} } };
+  const section = (items: unknown[]) => ({ id: 'c1', title: 'Sección', kind: 'section' as const, columns: 1 as const, fields: [], items });
+
+  const cases: Array<[string, unknown[], boolean]> = [
+    // La decisión que quedó tomada antes de que los bloques existieran: un
+    // contenedor con solo contenido informativo es válido.
+    ['solo un bloque informativo', [block], true],
+    ['bloque y campo', [block, fieldItem], true],
+    ['solo un campo', [fieldItem], true],
+    ['items vacío', [], false],
+  ];
+
+  it.each(cases)('%s → publicable=%s', (_name, items, publicable) => {
+    const definition = { ...v3, containers: [section(items)] };
+    // El esquema base nunca rechaza por completitud: es el que se usa al leer.
+    expect(formDefinitionSchema.safeParse(definition).success).toBe(true);
+    expect(publishableFormDefinitionSchema.safeParse(definition).success).toBe(publicable);
+  });
+
+  it('una sección de solo bloques no se marca como "sin campos"', () => {
+    // Antes de mirar `items`, esto reportaba "El contenedor debe tener al menos
+    // un campo" y bloqueaba publicar un formulario que el contrato acepta.
+    const result = publishableFormDefinitionSchema.safeParse({ ...v3, containers: [section([block])] });
+    expect(result.success).toBe(true);
+  });
+
+  it('las definiciones v2 siguen midiéndose por `fields`', () => {
+    const legacy = {
+      schemaVersion: 2 as const,
+      tipificationKey: 'generic@v1',
+      title: 'T',
+      submitLabel: 'Enviar',
+      containers: [{ id: 'c1', title: 'Sección', kind: 'section' as const, columns: 1 as const, fields: [] }],
+    };
+    expect(publishableFormDefinitionSchema.safeParse(legacy).success).toBe(false);
   });
 });

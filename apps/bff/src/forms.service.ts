@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { flattenFields, formDefinitionSchema, FormDefinition, publishableFormDefinitionSchema, RuntimeFormResponse, validateDefinition } from '@tramites/form-contracts';
+import { flattenFields, formDefinitionSchema, FormDefinition, Json, publishableFormDefinitionSchema, RuntimeFormResponse, validateDefinition } from '@tramites/form-contracts';
 import { assertFormAvailable } from './form-availability';
 import { badRequest, conflict, notFound } from './http-error';
 import { SupabaseService } from './supabase.service';
@@ -23,7 +23,7 @@ export class FormsService {
 
   async create(input: { name: string; definition: unknown }) {
     const definition = this.parseDefinition(input.definition);
-    const { data, error } = await this.supabase.db.from('forms').insert({ name: input.name, draft_definition: definition }).select('*').single();
+    const { data, error } = await this.supabase.db.from('forms').insert({ name: input.name, draft_definition: definition as unknown as Json }).select('*').single();
     if (error || !data) throw new Error(error?.message ?? 'No se pudo crear el formulario');
     return this.toSummary(data);
   }
@@ -36,7 +36,7 @@ export class FormsService {
   async updateDraft(publicId: string, input: { name?: string; definition: unknown }) {
     const definition = this.parseDefinition(input.definition);
     await this.findForm(publicId);
-    const { data, error } = await this.supabase.db.from('forms').update({ name: input.name?.trim() || undefined, draft_definition: definition, updated_at: new Date().toISOString() }).eq('public_id', publicId).select('*').single();
+    const { data, error } = await this.supabase.db.from('forms').update({ name: input.name?.trim() || undefined, draft_definition: definition as unknown as Json, updated_at: new Date().toISOString() }).eq('public_id', publicId).select('*').single();
     if (error || !data) throw new Error(error?.message ?? 'No se pudo guardar el borrador');
     return this.toSummary(data);
   }
@@ -64,7 +64,7 @@ export class FormsService {
     const { data: last, error: lastError } = await this.supabase.db.from('form_versions').select('version_number').eq('form_id', form.id).order('version_number', { ascending: false }).limit(1).maybeSingle();
     if (lastError) throw new Error(lastError.message);
     const versionNumber = (last?.version_number ?? 0) + 1;
-    const { data: version, error: versionError } = await this.supabase.db.from('form_versions').insert({ form_id: form.id, version_number: versionNumber, definition }).select('*').single();
+    const { data: version, error: versionError } = await this.supabase.db.from('form_versions').insert({ form_id: form.id, version_number: versionNumber, definition: definition as unknown as Json }).select('*').single();
     if (versionError || !version) {
       if (versionError?.code === '23505') conflict('La versión ya existe, intentá de nuevo');
       throw new Error(versionError?.message ?? 'No se pudo publicar');

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm, type FieldErrors, type Resolver } from 'react-hook-form';
-import type { DynamicFormProps, FormDefinition, FormRuntimeError, RuntimeFormResponse, SubmissionReceipt, UploadReference } from '@tramites/form-contracts';
+import type { DynamicFormProps, ExternalVariableValues, FormDefinition, FormRuntimeError, RuntimeFormResponse, SubmissionReceipt, UploadReference } from '@tramites/form-contracts';
 import { flattenFields } from '@tramites/form-contracts';
 import { validateSubmission } from '@tramites/form-contracts/validation';
 import { toErrorCode, toErrorMessage } from '../../../shared/lib/http';
@@ -34,11 +34,11 @@ function nestFieldErrors(errors: Record<string, string>): FieldErrors<FormValues
   return nested as FieldErrors<FormValues>;
 }
 
-const createResolver = (getDefinition: () => FormDefinition | undefined): Resolver<FormValues> =>
+const createResolver = (getDefinition: () => FormDefinition | undefined, getExternal: () => ExternalVariableValues): Resolver<FormValues> =>
   async (values) => {
     const definition = getDefinition();
     if (!definition) return { values, errors: {} };
-    const result = validateSubmission(definition, values);
+    const result = validateSubmission(definition, values, getExternal());
     if (result.success) return { values, errors: {} };
     return {
       values: {},
@@ -47,7 +47,7 @@ const createResolver = (getDefinition: () => FormDefinition | undefined): Resolv
   };
 
 export function useRuntimeForm(
-  { formId, apiBaseUrl, mode = 'published', onSubmitted, onError }: DynamicFormProps,
+  { formId, apiBaseUrl, mode = 'published', externalVariables = {}, contextToken, onSubmitted, onError }: DynamicFormProps,
   apiFactory: (baseUrl: string) => RuntimeApi = createRuntimeApi,
 ) {
   const api = useMemo(() => apiFactory(apiBaseUrl), [apiBaseUrl, apiFactory]);
@@ -58,10 +58,12 @@ export function useRuntimeForm(
   const [remoteError, setRemoteError] = useState<FormRuntimeError | null>(null);
   const uploadSession = useRef(crypto.randomUUID());
   const definitionRef = useRef<FormDefinition | undefined>(undefined);
+  const externalRef = useRef<ExternalVariableValues>(externalVariables as ExternalVariableValues);
+  externalRef.current = externalVariables as ExternalVariableValues;
   const form = useForm<FormValues>({
     mode: 'onTouched',
     reValidateMode: 'onChange',
-    resolver: createResolver(() => definitionRef.current),
+    resolver: createResolver(() => definitionRef.current, () => externalRef.current),
   });
   const values = form.watch();
   const definition = runtime?.definition;
@@ -99,7 +101,7 @@ export function useRuntimeForm(
     setSubmitting(true);
     setReceipt(null);
     setRemoteError(null);
-    const validation = validateSubmission(definition, payload);
+    const validation = validateSubmission(definition, payload, externalVariables as ExternalVariableValues);
     if (!validation.success) {
       applyFieldErrors(form.setError, validation.errors);
       setSubmitting(false);
@@ -110,7 +112,7 @@ export function useRuntimeForm(
       return;
     }
     try {
-      const nextReceipt = await api.submit(formId, { version: runtime.version, payload: validation.data }, uploadSession.current);
+      const nextReceipt = await api.submit(formId, { version: runtime.version, payload: validation.data, contextToken }, uploadSession.current);
       setReceipt(nextReceipt);
       onSubmitted?.(nextReceipt);
     } catch (error) {
@@ -152,5 +154,7 @@ export function useRuntimeForm(
     remoteError,
     submit,
     uploadFile: uploadCapability,
+    externalVariables,
+    contextToken,
   };
 }

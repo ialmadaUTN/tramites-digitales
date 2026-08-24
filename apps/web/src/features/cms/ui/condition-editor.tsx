@@ -1,6 +1,6 @@
 'use client';
 
-import type { ConditionGroup, ConditionOperator, FormField, ScalarValue } from '@tramites/form-contracts';
+import type { ConditionGroup, ConditionOperator, ExternalVariable, ExternalVariableType, FormField, ScalarValue } from '@tramites/form-contracts';
 import { CONDITION_OPERATORS } from '../model/constants';
 import { addConditionRule, removeConditionRule, setConditionLogic, updateConditionRule } from '../model/definition';
 
@@ -8,6 +8,7 @@ type ConditionEditorProps = {
   label: string;
   condition?: ConditionGroup;
   otherFields: FormField[];
+  externalVariables?: ExternalVariable[];
   error?: string;
   onChange: (value: ConditionGroup) => void;
 };
@@ -19,12 +20,12 @@ function valueKindOf(operator: ConditionOperator): 'none' | 'single' | 'list' {
 }
 
 /** Convierte el texto del input al tipo que espera el campo de origen. */
-function parseExpectedValue(raw: string, sourceField: FormField | undefined, operator: ConditionOperator): ScalarValue {
-  if (sourceField?.type === 'number' || NUMERIC_OPERATORS.includes(operator)) {
+function parseExpectedValue(raw: string, sourceField: FormField | undefined, operator: ConditionOperator, externalType?: ExternalVariableType): ScalarValue {
+  if (sourceField?.type === 'number' || externalType === 'number' || NUMERIC_OPERATORS.includes(operator)) {
     const parsed = Number(raw);
     return raw.trim() === '' || Number.isNaN(parsed) ? raw : parsed;
   }
-  if (sourceField?.type === 'checkbox') {
+  if (sourceField?.type === 'checkbox' || externalType === 'boolean') {
     if (raw.trim().toLowerCase() === 'true') return true;
     if (raw.trim().toLowerCase() === 'false') return false;
   }
@@ -37,11 +38,13 @@ function asList(value: unknown): ScalarValue[] {
 
 function SingleValueControl({
   sourceField,
+  externalType,
   operator,
   value,
   onChange,
 }: {
   sourceField: FormField | undefined;
+  externalType?: ExternalVariableType;
   operator: ConditionOperator;
   value: unknown;
   onChange: (next: ScalarValue) => void;
@@ -65,21 +68,21 @@ function SingleValueControl({
       </select>
     );
   }
-  if (sourceField?.type === 'checkbox') {
+  if (sourceField?.type === 'checkbox' || externalType === 'boolean') {
     return (
-      <select value={String(value ?? '')} onChange={(event) => onChange(parseExpectedValue(event.target.value, sourceField, operator))}>
+      <select value={String(value ?? '')} onChange={(event) => onChange(parseExpectedValue(event.target.value, sourceField, operator, externalType))}>
         <option value="">Seleccioná un valor</option>
         <option value="true">Marcado (true)</option>
         <option value="false">Sin marcar (false)</option>
       </select>
     );
   }
-  const numeric = sourceField?.type === 'number' || NUMERIC_OPERATORS.includes(operator);
+  const numeric = sourceField?.type === 'number' || externalType === 'number' || NUMERIC_OPERATORS.includes(operator);
   return (
     <input
       type={numeric ? 'number' : sourceField?.type === 'date' ? 'date' : 'text'}
       value={String(value ?? '')}
-      onChange={(event) => onChange(parseExpectedValue(event.target.value, sourceField, operator))}
+      onChange={(event) => onChange(parseExpectedValue(event.target.value, sourceField, operator, externalType))}
       placeholder={numeric ? 'Ej. 18' : 'Ej. SI / texto esperado'}
     />
   );
@@ -87,10 +90,12 @@ function SingleValueControl({
 
 function ListValueControl({
   sourceField,
+  externalType,
   value,
   onChange,
 }: {
   sourceField: FormField | undefined;
+  externalType?: ExternalVariableType;
   value: unknown;
   onChange: (next: ScalarValue[]) => void;
 }) {
@@ -133,7 +138,7 @@ function ListValueControl({
             .split(',')
             .map((part) => part.trim())
             .filter(Boolean)
-            .map((part) => parseExpectedValue(part, sourceField, 'in')),
+            .map((part) => parseExpectedValue(part, sourceField, 'in', externalType)),
         )
       }
       placeholder="Valores separados por coma. Ej. si, tal_vez"
@@ -141,9 +146,11 @@ function ListValueControl({
   );
 }
 
-export function ConditionEditor({ label, condition, otherFields, error, onChange }: ConditionEditorProps) {
+export function ConditionEditor({ label, condition, otherFields, externalVariables = [], error, onChange }: ConditionEditorProps) {
   if (!condition) return null;
-  const fallbackFieldId = otherFields[0]?.id ?? '';
+  const fallbackSource = otherFields[0]
+    ? { kind: 'field' as const, fieldId: otherFields[0].id }
+    : (externalVariables[0] ? { kind: 'external' as const, variable: externalVariables[0].name } : '');
 
   return (
     <div className="condition-editor">
@@ -167,7 +174,13 @@ export function ConditionEditor({ label, condition, otherFields, error, onChange
       </div>
 
       {condition.rules.map((rule, index) => {
-        const sourceField = otherFields.find((candidate) => candidate.id === rule.fieldId);
+        const conditionSource = rule.source;
+        const sourceField = otherFields.find((candidate) => candidate.id === (
+          conditionSource?.kind === 'field' ? conditionSource.fieldId : rule.fieldId
+        ));
+        const externalVariable = conditionSource?.kind === 'external'
+          ? externalVariables.find((candidate) => candidate.name === conditionSource.variable)
+          : undefined;
         const kind = valueKindOf(rule.operator);
         return (
           <div className="condition-rule" key={index}>
@@ -175,9 +188,25 @@ export function ConditionEditor({ label, condition, otherFields, error, onChange
               <div className="form-group">
                 <label>Depende del campo</label>
                 <select
-                  value={rule.fieldId}
-                  onChange={(event) => onChange(updateConditionRule(condition, index, { fieldId: event.target.value, value: '' }))}
+                  value={conditionSource?.kind === 'external'
+                    ? `external:${conditionSource.variable}`
+                    : conditionSource?.kind === 'field' ? conditionSource.fieldId : rule.fieldId ?? ''}
+                  onChange={(event) => {
+                    const selected = event.target.value;
+                    onChange(updateConditionRule(condition, index, selected.startsWith('external:')
+                      ? { fieldId: undefined, source: { kind: 'external', variable: selected.slice('external:'.length) }, value: '' }
+                      : { fieldId: undefined, source: { kind: 'field', fieldId: selected }, value: '' }));
+                  }}
                 >
+                  {externalVariables.length > 0 && (
+                    <optgroup label="Variables externas">
+                      {externalVariables.map((variable) => (
+                        <option key={variable.name} value={`external:${variable.name}`}>
+                          {variable.label} ({variable.name})
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                   {otherFields.map((candidate) => (
                     <option key={candidate.id} value={candidate.id}>
                       {candidate.label || candidate.fieldName || candidate.id}
@@ -213,12 +242,14 @@ export function ConditionEditor({ label, condition, otherFields, error, onChange
                   {kind === 'list' ? (
                     <ListValueControl
                       sourceField={sourceField}
+                      externalType={externalVariable?.type}
                       value={rule.value}
                       onChange={(next) => onChange(updateConditionRule(condition, index, { value: next }))}
                     />
                   ) : (
                     <SingleValueControl
                       sourceField={sourceField}
+                      externalType={externalVariable?.type}
                       operator={rule.operator}
                       value={rule.value}
                       onChange={(next) => onChange(updateConditionRule(condition, index, { value: next }))}
@@ -240,13 +271,44 @@ export function ConditionEditor({ label, condition, otherFields, error, onChange
         );
       })}
 
+      {(condition.groups ?? []).map((group, index) => (
+        <div className="condition-group-nested" key={index}>
+          <ConditionEditor
+            label={`Grupo anidado ${index + 1}`}
+            condition={group}
+            otherFields={otherFields}
+            externalVariables={externalVariables}
+            onChange={(next) => onChange({ ...condition, groups: (condition.groups ?? []).map((candidate, candidateIndex) => candidateIndex === index ? next : candidate) })}
+          />
+          <button
+            type="button"
+            className="button sm ghost"
+            title="Quitar grupo anidado"
+            onClick={() => onChange({ ...condition, groups: (condition.groups ?? []).filter((_, candidateIndex) => candidateIndex !== index) })}
+          >
+            Quitar grupo
+          </button>
+        </div>
+      ))}
+
       <button
         type="button"
         className="button sm secondary"
-        disabled={otherFields.length === 0}
-        onClick={() => onChange(addConditionRule(condition, fallbackFieldId))}
+        disabled={otherFields.length === 0 && externalVariables.length === 0}
+        onClick={() => onChange(addConditionRule(condition, fallbackSource))}
       >
         + Agregar regla
+      </button>
+      <button
+        type="button"
+        className="button sm secondary"
+        disabled={otherFields.length === 0 && externalVariables.length === 0}
+        onClick={() => onChange({
+          ...condition,
+          groups: [...(condition.groups ?? []), addConditionRule({ logic: 'all', rules: [] }, fallbackSource)],
+        })}
+      >
+        + Agregar grupo anidado
       </button>
       {error && <span className="field-error">{error}</span>}
     </div>

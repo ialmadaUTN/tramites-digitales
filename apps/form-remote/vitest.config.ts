@@ -8,8 +8,8 @@ export default defineConfig({
     coverage: coverage(
       // Piso = lo ya alcanzado (ratchet): impide retroceder sin fingir una
       // meta. `use-runtime-form` ya tiene tests (carga, pausa y error de
-      // envío); lo que sigue abierto es `dynamic-field` + `dynamic-repeater`.
-      { statements: 47, branches: 30, functions: 46, lines: 49 },
+      // envío); lo que sigue abierto es `dynamic-repeater`.
+      { statements: 61, branches: 53, functions: 57, lines: 63 },
       [
         // Adaptadores de red y de Supabase: sin lógica propia, se verifican en
         // los e2e contra los servicios reales.

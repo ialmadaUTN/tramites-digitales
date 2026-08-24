@@ -4,6 +4,7 @@ import { joinUrl } from '../../../shared/lib/http';
 export type SubmitInput = {
   version: number;
   payload: Record<string, unknown>;
+  contextToken?: string;
 };
 
 export type UploadTicket = { uploadId: string; bucket: string; path: string; token: string; expiresIn: number };
@@ -36,8 +37,8 @@ export function createRuntimeApi(apiBaseUrl: string): RuntimeApi {
     async submit(formId, input, uploadSession) {
       const response = await fetch(joinUrl(apiBaseUrl, `runtime/forms/${formId}/submissions`), {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'Idempotency-Key': crypto.randomUUID(), 'X-Upload-Session': uploadSession },
-        body: JSON.stringify(input),
+        headers: { 'content-type': 'application/json', 'Idempotency-Key': crypto.randomUUID(), 'X-Upload-Session': uploadSession, ...(input.contextToken ? { 'X-Form-Context': input.contextToken } : {}) },
+        body: JSON.stringify({ version: input.version, payload: input.payload }),
       });
       if (!response.ok) throw await toApiError(response, 'No se pudo enviar el formulario');
       return (await response.json()) as SubmissionReceipt;

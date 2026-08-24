@@ -27,6 +27,7 @@ describe('operadores de condición', () => {
   const cases: [operator: ConditionOperator, expected: unknown, actual: unknown, result: boolean][] = [
     ['equals', 'si', 'si', true],
     ['equals', 'si', 'no', false],
+    ['equals', null, null, false],
     ['notEquals', 'si', 'no', true],
     ['notEquals', 'si', 'si', false],
     ['in', ['a', 'b'], 'b', true],
