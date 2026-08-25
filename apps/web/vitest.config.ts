@@ -17,7 +17,7 @@ export default defineConfig({
         'src/features/cms/ui/**': { statements: 58, branches: 70, functions: 51, lines: 63 },
         // Piso global. `hooks/use-cms-workspace.ts` ya está cubierto: decide
         // cuándo se puede guardar, publicar y pausar, y qué aviso ve el autor.
-        statements: 79,
+        statements: 80,
         branches: 78,
         functions: 68,
         lines: 83,

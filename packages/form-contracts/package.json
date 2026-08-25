@@ -9,6 +9,7 @@
     "./field-name": "./src/field-name.ts",
     "./field-rules": "./src/field-rules.ts",
     "./migrations": "./src/migrations.ts",
+    "./structural-validation": "./src/structural-validation.ts",
     "./validation": "./src/validation.ts"
   },
   "scripts": {

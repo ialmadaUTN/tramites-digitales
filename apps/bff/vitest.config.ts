@@ -7,7 +7,8 @@ export default defineConfig({
     include: ['src/**/*.test.ts'],
     coverage: coverage(
       // Piso = lo ya alcanzado sobre la lógica que queda (registry de
-      // tipificación, cliente de Dynamics y disponibilidad del formulario).
+      // tipificación, cliente de Dynamics, disponibilidad y completitud
+      // estructural del formulario).
       { statements: 86, branches: 78, functions: 87, lines: 95 },
       [
         // Controllers y servicios que solo orquestan Supabase y HTTP: cubrirlos

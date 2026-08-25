@@ -101,6 +101,20 @@ describe('useCmsWorkspace · guardar y publicar', () => {
     expect(result.current.status).toEqual({ text: 'Borrador guardado' });
   });
 
+  it('no publica un borrador estructuralmente incompleto, y dice qué falta', async () => {
+    // La decisión de TD-20: el borrador incompleto se guarda, no se publica.
+    const api = fakeApi();
+    const { result } = await mount(api);
+    await act(async () => { await result.current.selectForm('form-1'); });
+    act(() => { result.current.setDefinition({ ...result.current.definition, containers: [] }); });
+
+    await act(async () => { await result.current.publish(); });
+
+    expect(api.publish).not.toHaveBeenCalled();
+    expect(api.saveDraft).not.toHaveBeenCalled();
+    expect(result.current.status).toEqual({ text: 'El formulario debe tener al menos un contenedor', error: true });
+  });
+
   it('publicar guarda primero: si el guardado falla, no publica', async () => {
     const api = fakeApi({ saveDraft: vi.fn(async () => { throw new Error('sin conexión'); }) });
     const { result } = await mount(api);

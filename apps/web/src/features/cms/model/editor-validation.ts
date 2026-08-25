@@ -3,6 +3,7 @@ import { containerFields } from '@tramites/form-contracts/field-rules';
 import { duplicateOptionValues, isMaskCompatible, isValidRegexPattern, optionCatalogIncludes } from '@tramites/form-contracts/field-rules';
 import { fieldNameError } from '@tramites/form-contracts/field-name';
 import { validateFieldDefaultValue } from '@tramites/form-contracts/default-value-validation';
+import { structuralIssues } from '@tramites/form-contracts/structural-validation';
 import {
   LENGTH_RULE_FIELD_TYPES,
   OPTION_FIELD_TYPES,
@@ -30,6 +31,7 @@ export type ContainerEditorErrors = {
   title?: string;
   fieldName?: string;
   rows?: string;
+  /** Contenedor sin contenido. Bloquea publicar, no guardar. */
   fields?: string;
   conditions?: string;
 };
@@ -45,10 +47,18 @@ export type DefinitionEditorErrors = {
   submitLabel?: string;
   tipificationKey?: string;
   conditions?: string;
+  /** Formulario sin contenedores. Bloquea publicar, no guardar. */
+  structure?: string;
   containers: Record<string, ContainerEditorErrors>;
   fields: Record<string, FieldEditorErrors>;
   textBlocks: Record<string, TextBlockEditorErrors>;
+  /**
+   * Algo mal definido: bloquea guardar. Los problemas de completitud
+   * estructural no cuentan acá, porque un borrador a medias se puede guardar.
+   */
   hasErrors: boolean;
+  /** Completo y bien definido: recién ahí se puede publicar. */
+  canPublish: boolean;
 };
 
 const isWholeNumber = (value: number | undefined): boolean => value === undefined || Number.isInteger(value);
@@ -258,7 +268,9 @@ function containerErrorsFor(container: FormContainer): ContainerEditorErrors {
 
   const repeaterFieldNameError = fieldNameError(container.fieldName ?? '');
   if (repeaterFieldNameError) errors.fieldName = repeaterFieldNameError;
-  if (containerFields(container).length === 0) errors.fields = 'La grilla necesita al menos una columna';
+  // El contenedor sin contenido no se marca acá: es completitud estructural y la
+  // resuelve `structuralIssues`, que también cubre las secciones y usa el mismo
+  // mensaje que el contrato.
 
   const { minRows, maxRows } = container;
   if (!isWholeNumber(minRows) || !isWholeNumber(maxRows)) {
@@ -362,17 +374,36 @@ export function collectDefinitionEditorErrors(definition: FormDefinition, name?:
     if (conditionError) containers[container.id] = { ...containers[container.id], conditions: conditionError };
   }
 
+  // Lo que bloquea **guardar**: algo mal definido. Se calcula antes de sumar los
+  // problemas de completitud, que solo bloquean publicar.
+  const hasErrors = Boolean(
+    nameError || titleError || submitLabelError || tipificationKeyError || formConditionError
+      || Object.keys(containers).length || Object.keys(fields).length || Object.keys(textBlocks).length,
+  );
+
+  // Completitud estructural, desde el contrato: mismo criterio y mismos mensajes
+  // que aplica el BFF al publicar.
+  const issues = structuralIssues(definition);
+  let structure: string | undefined;
+  for (const issue of issues) {
+    if (!issue.containerId) {
+      structure = issue.message;
+      continue;
+    }
+    containers[issue.containerId] = { ...containers[issue.containerId], fields: issue.message };
+  }
+
   return {
     name: nameError,
     title: titleError,
     submitLabel: submitLabelError,
     tipificationKey: tipificationKeyError,
     conditions: formConditionError,
+    structure,
     containers,
     fields,
     textBlocks,
-    hasErrors: Boolean(
-      nameError || titleError || submitLabelError || tipificationKeyError || formConditionError || Object.keys(containers).length || Object.keys(fields).length || Object.keys(textBlocks).length,
-    ),
+    hasErrors,
+    canPublish: !hasErrors && issues.length === 0,
   };
 }

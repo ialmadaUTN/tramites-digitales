@@ -109,6 +109,67 @@ describe('workspace del CMS · pausar y reactivar', () => {
   });
 });
 
+describe('workspace del CMS · completitud estructural', () => {
+  function renderWithDefinition(definition: FormDefinition) {
+    const onPublish = vi.fn();
+    const onSave = vi.fn();
+    render(
+      <WorkspaceHeader
+        title="Demo"
+        formId="11111111-1111-4111-8111-111111111111"
+        name="Demo"
+        definition={definition}
+        editorErrors={collectDefinitionEditorErrors(definition, 'Demo')}
+        status={null}
+        saving={false}
+        preview={false}
+        published={false}
+        paused={false}
+        onNameChange={() => {}}
+        onDefinitionChange={() => {}}
+        onTogglePreview={() => {}}
+        onSave={onSave}
+        onPublish={onPublish}
+        onToggleAvailability={() => {}}
+      />,
+    );
+    return { onPublish, onSave };
+  }
+
+  const complete: FormDefinition = {
+    schemaVersion: 2,
+    tipificationKey: 'generic@v1',
+    title: 'Demo',
+    submitLabel: 'Enviar',
+    containers: [{
+      id: 'c1',
+      title: 'Uno',
+      kind: 'section',
+      columns: 1,
+      fields: [{ id: 'f1', fieldName: 'nombre', type: 'text', label: 'Nombre', width: 'full', rules: {} }],
+    }],
+  };
+
+  it('con un contenedor vacío, Publicar queda deshabilitado y Guardar no', async () => {
+    // La decisión del ticket: el borrador incompleto se guarda, no se publica.
+    const incomplete = { ...complete, containers: [{ ...complete.containers[0]!, fields: [] }] };
+    const { onSave, onPublish } = renderWithDefinition(incomplete);
+
+    expect(screen.getByRole('button', { name: /Publicar/ }).hasAttribute('disabled')).toBe(true);
+
+    await userEvent.click(screen.getByRole('button', { name: /Guardar/ }));
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onPublish).not.toHaveBeenCalled();
+  });
+
+  it('con el formulario completo, Publicar se habilita', async () => {
+    const { onPublish } = renderWithDefinition(complete);
+
+    await userEvent.click(screen.getByRole('button', { name: /Publicar/ }));
+    expect(onPublish).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('workspace del CMS · recuperar un borrador pausado', () => {
   it('ofrece Reactivar aunque el formulario no tenga versión publicada', () => {
     // La API ya no deja pausar borradores, pero una fila que quedó en ese estado
