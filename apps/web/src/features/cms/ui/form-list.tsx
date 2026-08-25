@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { FormSummary } from '../api/forms-api';
+import { availabilityBadge } from '../model/availability';
 
 type FormListProps = {
   forms: FormSummary[];
@@ -54,6 +55,7 @@ export function FormList({ forms, selectedId, saving, onCreate, onSelect }: Form
       <div className="form-list">
         {filteredForms.map((form) => {
           const isSelected = selectedId === form.id;
+          const availability = availabilityBadge(form);
           return (
             <button
               key={form.id}
@@ -62,9 +64,9 @@ export function FormList({ forms, selectedId, saving, onCreate, onSelect }: Form
             >
               <span className="form-item-title">{form.name}</span>
               <span className="form-item-meta">
-                <span className={`badge ${form.published ? 'badge-success' : 'badge-warning'}`}>
+                <span className={`badge ${availability.className}`}>
                   <span className="badge-dot" />
-                  {form.published ? 'Publicado' : 'Borrador'}
+                  {availability.label}
                 </span>
                 <span className="form-item-id">#{form.id.slice(0, 8)}</span>
               </span>

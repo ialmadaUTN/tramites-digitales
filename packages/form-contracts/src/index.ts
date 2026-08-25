@@ -4,6 +4,14 @@ export { FIELD_NAME_INVALID_MESSAGE, FIELD_NAME_PATTERN, fieldNameError } from '
 import { FIELD_NAME_INVALID_MESSAGE, FIELD_NAME_PATTERN } from './field-name.js';
 export { REQUIRED_CONFLICT_MESSAGE, canBecomeRequired, hasRequiredConflict } from './required-semantics.js';
 import { canBecomeRequired, hasRequiredConflict, REQUIRED_CONFLICT_MESSAGE } from './required-semantics.js';
+export {
+  EMPTY_CONTAINER_MESSAGE,
+  EMPTY_FORM_MESSAGE,
+  EMPTY_REPEATER_MESSAGE,
+  structuralIssues,
+  type StructuralIssue,
+} from './structural-validation.js';
+import { structuralIssues } from './structural-validation.js';
 
 export const fieldTypeSchema = z.enum([
   'text',
@@ -544,6 +552,19 @@ export const formDefinitionSchema = z
 export type FormDefinition = z.infer<typeof formDefinitionSchema>;
 
 export { upgradeDefinitionToV2, upgradeDefinitionToV3 } from './migrations.js';
+
+/**
+ * Definición lista para publicar: el esquema base **más** la completitud
+ * estructural. Es un esquema aparte y no una regla más del base porque el base
+ * también valida las lecturas; ver `structural-validation.ts`.
+ *
+ * Guardar un borrador usa `formDefinitionSchema`; publicar usa este.
+ */
+export const publishableFormDefinitionSchema = formDefinitionSchema.superRefine((definition, ctx) => {
+  for (const issue of structuralIssues(definition)) {
+    ctx.addIssue({ code: 'custom', path: issue.path, message: issue.message });
+  }
+});
 
 /**
  * Upgrades a legacy definition when it enters the CMS. Published v1 versions

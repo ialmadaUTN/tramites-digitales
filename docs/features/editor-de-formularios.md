@@ -19,6 +19,8 @@ El formulario vive como una **definición JSON** que atraviesa cuatro piezas:
 
 Flujo de autoría: crear → editar → **Guardar** (borrador) → **Publicar** (versión inmutable). El host consume siempre la última versión publicada; la vista previa del CMS consume el borrador.
 
+Una vez publicado, el formulario se puede sacar de circulación sin despublicarlo: ver [pausa de formularios](pausa-de-formularios.md). Publicar una versión nueva no reactiva un formulario pausado, y la vista previa del borrador sigue funcionando aunque lo esté.
+
 Los recorridos E2E que crean formularios (`tests/e2e/authoring-journey.spec.ts` y `tests/e2e/form-flow.spec.ts`) usan formularios reales para verificar el CMS y la cadena CMS → BFF → Supabase → host. Cada `afterEach` registra el ID desde el momento de la creación y elimina sus submissions, los uploads cuando el schema REST los expone y el formulario al terminar, incluso si una aserción posterior falla; las versiones publicadas se eliminan por cascade de la base.
 
 ### Estructura
@@ -125,6 +127,24 @@ El editor reproduce las reglas del contrato y muestra el error **junto al campo*
 | Archivos: cantidad fuera de rango o no entera | Se admiten entre 1 y 5 archivos |
 | Solo lectura mal configurado | Ver [Campos de solo lectura](campos-de-solo-lectura.md) |
 | Claves de payload duplicadas o inválidas | Este nombre de clave ya se usa en otro campo |
+
+### Completitud estructural: bloquea publicar, no guardar
+
+Hay un segundo nivel de validación con una severidad distinta. Los problemas de arriba son **definiciones mal hechas** y bloquean el guardado. La completitud estructural es otra cosa: un borrador es trabajo a medias por definición, así que **se guarda igual** y lo que queda bloqueado es publicarlo.
+
+| Regla | Mensaje | Dónde se marca |
+| --- | --- | --- |
+| El formulario necesita al menos un contenedor | El formulario debe tener al menos un contenedor | Estado vacío del editor |
+| Una sección necesita al menos un campo | El contenedor debe tener al menos un campo | El contenedor específico |
+| Una grilla repetible necesita al menos una columna | La grilla necesita al menos una columna | El contenedor específico |
+
+`collectDefinitionEditorErrors` devuelve las dos severidades por separado: `hasErrors` (bloquea guardar) y `canPublish` (bloquea publicar). El botón **Publicar** queda deshabilitado con el motivo en el tooltip.
+
+Las reglas viven en `packages/form-contracts/src/structural-validation.ts` y el editor las consume desde ahí, así que el mensaje que ve el autor es el mismo que devolvería el BFF. Del lado del servidor, `publish()` valida contra `publishableFormDefinitionSchema` y responde 400 sin crear la versión; `updateDraft()` sigue usando el esquema base.
+
+**Por qué son dos esquemas y no una regla más en el base:** `formDefinitionSchema` también valida las **lecturas** — `list()` lo corre por cada formulario. Si rechazara definiciones incompletas, un único borrador vacío ya guardado dejaría al CMS sin listado y sin forma de entrar a arreglarlo.
+
+**Contenedores solo informativos:** hoy todos los tipos de campo son de entrada, así que "tener contenido" es "tener al menos un campo". Cuando existan componentes informativos (FAQ, textos de ayuda), un contenedor que solo los tenga **se considera válido**; la decisión ya está tomada y el único lugar a tocar es `hasContent` en `structural-validation.ts`.
 | Condiciones incompletas o mal apuntadas | Ver [Lógica condicional](logica-condicional.md) |
 | Obligatoriedad fija y condicional a la vez | Un campo obligatorio no puede tener además obligatoriedad condicional: dejá solo una de las dos |
 | Variables externas, plantillas o bloques incompatibles | La variable no está declarada, el placeholder es inválido, el tipo no coincide o el bloque se usa dentro de una grilla |
@@ -147,6 +167,7 @@ El BFF revalida todo contra el contrato al guardar: el editor adelanta el diagn�
 | Mutaciones de la definición | `apps/web/src/features/cms/model/definition.ts` |
 | Migración v1/v2 al abrir el CMS | `packages/form-contracts/src/migrations.ts` (`upgradeDefinitionToV3`, reexportada por `index.ts`) |
 | Validación previa al guardado | `apps/web/src/features/cms/model/editor-validation.ts` |
+| Completitud estructural | `packages/form-contracts/src/structural-validation.ts` |
 | Editor de campo | `apps/web/src/features/cms/ui/field-editor.tsx` |
 | Tablas de reglas (tests) | `packages/form-contracts/src/rules.test.ts` |
 
@@ -155,6 +176,9 @@ El BFF revalida todo contra el contrato al guardar: el editor adelanta el diagn�
 - **2026-08-21** — El E2E de autoría limpia el formulario creado y sus dependencias al finalizar para no acumular datos de prueba publicados.
 - **2026-08-20** — Se agregaron campos de solo lectura, reglas de longitud en todos los tipos de texto, mensajes de error de formato y de tipo, obligatoriedad configurable en columnas de grilla, editor de condiciones con reglas múltiples y todos los operadores, validación de catálogos y de valores por defecto, y validación previa al guardado para regex, duplicados, rangos, máscaras y parámetros no enteros.
 - **2026-08-20** — Se retiró del CMS la acción para crear nuevas grillas repetibles; las grillas existentes siguen siendo editables.
+- **2026-08-20** — El ciclo de autoría suma la pausa: un formulario publicado se puede sacar de circulación y reactivar desde el encabezado del workspace, y el listado lo rotula como "Pausado". Detalle en [pausa de formularios](pausa-de-formularios.md).
+- **2026-08-20** — Se agregó la validación de completitud estructural (formulario sin contenedores, contenedor sin campos, grilla sin columnas) como un nivel aparte del esquema base: bloquea publicar pero no guardar, porque un borrador es trabajo a medias. `collectDefinitionEditorErrors` devuelve ahora `canPublish` además de `hasErrors`, y el BFF valida `publish()` contra `publishableFormDefinitionSchema`.
 - **2026-08-21** — Se agregó la autoría v3 de variables externas, condiciones jerárquicas, exclusión independiente y bloques informativos ordenados; los formularios v1/v2 se migran a v3 al abrirse en el CMS sin alterar la versión publicada.
 - **2026-08-21** — La vista previa del CMS incorporó un panel de contexto tipado para probar variables externas y mostrar el estado efectivo y el payload limpio sin enviar esos valores al servidor.
 - **2026-08-21** — Los bloques informativos incorporaron plantillas dinámicas seguras, validación de referencias externas y reordenamiento dentro de la secuencia de campos.
+- **2026-08-21** — La completitud estructural pasó a leer `items`: una sección con solo bloques informativos es contenido válido y se puede publicar, que era la decisión que quedó tomada cuando esos bloques todavía no existían.

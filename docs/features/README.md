@@ -24,6 +24,7 @@ La regla completa está en [`AGENTS.md`](../../AGENTS.md) en la raíz del reposi
 | [Lógica condicional](logica-condicional.md) | Visibilidad, habilitación y obligatoriedad condicionales entre campos. |
 | [Bloques informativos](bloques-informativos.md) | Bloques de texto y visibilidad contextual dentro de una sección. |
 | [Grillas repetibles](grillas-repetibles.md) | Contenedores de filas repetibles y sus columnas. |
+| [Pausa de formularios](pausa-de-formularios.md) | Sacar de circulación un formulario publicado y reactivarlo: qué se bloquea, con qué código HTTP y cómo se comporta ante caché, reintentos y sesiones abiertas. |
 
 ## Qué no va acá
 

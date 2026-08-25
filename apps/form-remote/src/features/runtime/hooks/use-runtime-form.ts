@@ -3,7 +3,7 @@ import { useForm, type FieldErrors, type Resolver } from 'react-hook-form';
 import type { DynamicFormProps, ExternalVariableValues, FormDefinition, FormRuntimeError, RuntimeFormResponse, SubmissionReceipt, UploadReference } from '@tramites/form-contracts';
 import { flattenFields } from '@tramites/form-contracts';
 import { validateSubmission } from '@tramites/form-contracts/validation';
-import { toErrorMessage } from '../../../shared/lib/http';
+import { toErrorCode, toErrorMessage } from '../../../shared/lib/http';
 import type { FormValues } from '../../../shared/types/form-values';
 import { createRuntimeApi, type RuntimeApi } from '../api/runtime-api';
 import { getStorageClient } from '../api/storage-client';
@@ -52,7 +52,7 @@ export function useRuntimeForm(
 ) {
   const api = useMemo(() => apiFactory(apiBaseUrl), [apiBaseUrl, apiFactory]);
   const [runtime, setRuntime] = useState<RuntimeFormResponse | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<FormRuntimeError | null>(null);
   const [receipt, setReceipt] = useState<SubmissionReceipt | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [remoteError, setRemoteError] = useState<FormRuntimeError | null>(null);
@@ -81,7 +81,15 @@ export function useRuntimeForm(
         if (!cancelled) setRuntime(data);
       })
       .catch((error: unknown) => {
-        if (!cancelled) setLoadError(toErrorMessage(error, 'No se pudo cargar el formulario'));
+        if (cancelled) return;
+        // El mensaje lo define el BFF (fuente única); acá solo se propaga junto con el code,
+        // que es lo que le permite a la UI distinguir un formulario pausado de un fallo real.
+        const runtimeError: FormRuntimeError = {
+          code: toErrorCode(error, 'LOAD_ERROR'),
+          message: toErrorMessage(error, 'No se pudo cargar el formulario'),
+        };
+        setLoadError(runtimeError);
+        onError?.(runtimeError);
       });
     return () => {
       cancelled = true;
@@ -108,8 +116,10 @@ export function useRuntimeForm(
       setReceipt(nextReceipt);
       onSubmitted?.(nextReceipt);
     } catch (error) {
+      // Sesión ya iniciada: el formulario se cargó antes de la pausa y el envío llega después.
+      // Conservar el code del BFF permite mostrar el mensaje de pausa en vez de un error genérico.
       const formError: FormRuntimeError = {
-        code: 'SUBMIT_ERROR',
+        code: toErrorCode(error, 'SUBMIT_ERROR'),
         message: toErrorMessage(error, 'No se pudo enviar el formulario'),
       };
       setRemoteError(formError);

@@ -64,39 +64,29 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # Los e2e levantan el stack completo contra un Supabase real. Sin las
-      # credenciales configuradas el job se salta en vez de fallar, así que un
-      # fork o un repo recién clonado no queda con el CI en rojo por algo que
-      # no puede resolver.
-      - name: ¿Hay credenciales de Supabase?
-        id: guard
+      # Los e2e son un gate obligatorio. Una configuración incompleta debe
+      # fallar de forma visible, nunca convertirse en un job omitido.
+      - name: Validar credenciales de Supabase
         run: |
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SECRET_KEY" ]; then
-            echo "Faltan los secrets SUPABASE_URL / SUPABASE_SECRET_KEY: se omiten los e2e."
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "::error::Faltan los secrets SUPABASE_URL y/o SUPABASE_SECRET_KEY; los tests E2E son obligatorios."
+            exit 1
           fi
 
       - uses: pnpm/action-setup@v4
-        if: steps.guard.outputs.run == 'true'
 
       - uses: actions/setup-node@v5
-        if: steps.guard.outputs.run == 'true'
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
       - name: Instalar dependencias
-        if: steps.guard.outputs.run == 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Instalar navegador de Playwright
-        if: steps.guard.outputs.run == 'true'
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Preparar variables del BFF
-        if: steps.guard.outputs.run == 'true'
         # El BFF lee `.env.local` desde la raíz del workspace.
         run: |
           {
@@ -106,11 +96,10 @@ jobs:
           } > .env.local
 
       - name: Tests end to end
-        if: steps.guard.outputs.run == 'true'
         run: pnpm test:e2e
 
       - name: Publicar reporte de Playwright
-        if: always() && steps.guard.outputs.run == 'true'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report

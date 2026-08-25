@@ -10,6 +10,7 @@
     "./field-rules": "./src/field-rules.ts",
     "./migrations": "./src/migrations.ts",
     "./required-semantics": "./src/required-semantics.ts",
+    "./structural-validation": "./src/structural-validation.ts",
     "./validation": "./src/validation.ts"
   },
   "scripts": {
