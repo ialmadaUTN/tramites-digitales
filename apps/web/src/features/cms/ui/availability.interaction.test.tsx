@@ -169,3 +169,17 @@ describe('workspace del CMS · completitud estructural', () => {
     expect(onPublish).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('workspace del CMS · recuperar un borrador pausado', () => {
+  it('ofrece Reactivar aunque el formulario no tenga versión publicada', () => {
+    // La API ya no deja pausar borradores, pero una fila que quedó en ese estado
+    // tiene que poder recuperarse desde la UI.
+    renderHeader({ published: false, paused: true });
+    expect(screen.getByRole('button', { name: /Reactivar/ })).toBeTruthy();
+  });
+
+  it('sigue sin ofrecer Pausar sobre un borrador', () => {
+    renderHeader({ published: false, paused: false });
+    expect(screen.queryByRole('button', { name: /Pausar/ })).toBeNull();
+  });
+});

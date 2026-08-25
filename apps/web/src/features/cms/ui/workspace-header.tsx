@@ -108,8 +108,13 @@ export function WorkspaceHeader({
             Guardar
           </button>
 
-          {/* Pausar solo tiene sentido sobre algo que está publicado: es lo publicado lo que se saca de circulación. */}
-          {published && (
+          {/*
+            Pausar solo tiene sentido sobre algo publicado: es lo publicado lo que
+            se saca de circulación. Reactivar, en cambio, se ofrece siempre que el
+            formulario esté pausado, aunque no tenga versión publicada: si no, una
+            fila pausada por fuera del CMS quedaría sin forma de recuperarse.
+          */}
+          {(published || paused) && (
             <button
               className={paused ? 'button secondary' : 'button danger'}
               onClick={onToggleAvailability}

@@ -9,7 +9,7 @@ export default defineConfig({
       // Piso = lo ya alcanzado sobre la lógica que queda (registry de
       // tipificación, cliente de Dynamics, disponibilidad y completitud
       // estructural del formulario).
-      { statements: 85, branches: 70, functions: 80, lines: 93 },
+      { statements: 86, branches: 78, functions: 87, lines: 95 },
       [
         // Controllers y servicios que solo orquestan Supabase y HTTP: cubrirlos
         // con mocks termina testeando al mock. El recorrido real es el e2e.

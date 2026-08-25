@@ -162,3 +162,30 @@ describe('FormsService · pausa', () => {
     expect(form.paused_at).toBe('2026-08-20T22:00:00.000Z');
   });
 });
+
+/**
+ * Pausar es sacar de circulación lo publicado. Permitirlo sobre un borrador
+ * dejaba un formulario pausado que el CMS no sabía reactivar.
+ */
+describe('FormsService · solo se pausa lo publicado', () => {
+  it('rechaza pausar un formulario sin versión publicada', async () => {
+    const form = makeForm({ published_version_id: null });
+    const service = makeService(form);
+
+    await expect(service.pause(form.public_id)).rejects.toMatchObject({
+      response: { code: 'CONFLICT', message: 'Solo se puede pausar un formulario publicado' },
+    });
+    expect(form.paused_at).toBeNull();
+  });
+
+  it('reactivar sigue funcionando aunque no haya versión publicada', async () => {
+    // Para poder recuperar filas que ya quedaron pausadas antes de esta regla.
+    const form = makeForm({ published_version_id: null, paused_at: '2026-08-20T22:00:00.000Z' });
+    const service = makeService(form);
+
+    const summary = await service.resume(form.public_id);
+
+    expect(summary.paused).toBe(false);
+    expect(form.paused_at).toBeNull();
+  });
+});

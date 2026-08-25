@@ -33,4 +33,29 @@ describe('UploadsService · pausa', () => {
       response: { code: 'FORM_PAUSED', message: 'Este formulario no está disponible en este momento' },
     });
   });
+
+  it('tampoco permite completar una carga ya iniciada', async () => {
+    // La carga pudo abrirse antes de la pausa. Completarla no puede desembocar en
+    // nada —la submission se rechaza igual— pero escribiría en storage y dejaría
+    // la carga en `ready` sobre un formulario fuera de circulación.
+    const updates: unknown[] = [];
+    const forms = {
+      runtime: async () => {
+        assertFormAvailable({ paused_at: '2026-08-20T22:00:00.000Z' });
+        throw new Error('inalcanzable');
+      },
+    } as unknown as FormsService;
+
+    const supabase = {
+      db: { from: () => ({ update: (payload: unknown) => { updates.push(payload); return { eq: () => Promise.resolve({ error: null }) }; } }) },
+    } as unknown as SupabaseService;
+
+    const service = new UploadsService(supabase, forms);
+
+    await expect(service.completeUpload('form-1', 'upload-1', 'sesion')).rejects.toMatchObject({
+      response: { code: 'FORM_PAUSED', message: 'Este formulario no está disponible en este momento' },
+    });
+    // El corte es antes de tocar la carga: no cambia de estado.
+    expect(updates).toHaveLength(0);
+  });
 });

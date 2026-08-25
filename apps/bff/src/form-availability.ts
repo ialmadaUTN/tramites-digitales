@@ -7,6 +7,14 @@ import { formPaused } from './http-error';
  * La pausa es un eje independiente de la publicación. Un formulario pausado conserva
  * su versión publicada; lo que cambia es que el runtime deja de entregarla.
  */
+/**
+ * SQLSTATE que levanta el trigger `submissions_reject_when_form_paused` cuando
+ * la pausa ocurre entre la validación del BFF y el insert. El chequeo de la
+ * aplicación no puede ser atómico —hay I/O en el medio— así que la decisión
+ * final la toma la base, y acá se traduce al mismo 409 de siempre.
+ */
+export const FORM_PAUSED_SQLSTATE = 'TD001';
+
 export type FormAvailability = { paused_at: string | null };
 
 export function isPaused(form: FormAvailability): boolean {
