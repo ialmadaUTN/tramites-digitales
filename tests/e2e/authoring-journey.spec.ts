@@ -56,16 +56,23 @@ test('un formulario creado en el CMS se publica y se completa en el host', async
   await formGroup(page, 'Nombre interno (gestión)').locator('input').fill(formName);
   await formGroup(page, 'Título visible al usuario').locator('input').fill('Solicitud de prueba');
 
-  // --- Campo 1: obligatorio ------------------------------------------------
+  // --- Campo 1: obligatoriedad condicional ----------------------------------
   const nombre = fieldEditor(page, 0);
   await nombre.locator('.form-group').filter({ hasText: 'Etiqueta visible (Label)' }).locator('input').fill('Nombre completo');
-  await nombre.getByLabel('Obligatorio').check();
 
   // --- Contexto externo y bloque informativo ------------------------------
   await page.getByRole('button', { name: /Agregar variable externa/ }).click();
   await page.getByRole('button', { name: /Agregar variable externa/ }).click();
+  const trustedInsuranceVariable = page.locator('.form-group').filter({ hasText: 'variable1' }).first();
+  await trustedInsuranceVariable.locator('select').nth(1).selectOption('trusted');
   const trustedVariable = page.locator('.form-group').filter({ hasText: 'variable2' }).first();
   await trustedVariable.locator('select').nth(1).selectOption('trusted');
+
+  await nombre.getByLabel('Obligatoriedad condicional').check();
+  const requiredCondition = nombre.locator('.condition-editor').filter({ hasText: 'Lógica condicional: Obligatoriedad' });
+  await requiredCondition.locator('.condition-rule').locator('select').first().selectOption('external:variable1');
+  await requiredCondition.locator('.condition-rule').locator('input').fill('2050');
+
   await page.getByRole('button', { name: /Agregar bloque informativo/ }).first().click();
   const contextualBlock = fieldEditor(page, 1);
   await contextualBlock.locator('.form-group').filter({ hasText: 'Título' }).locator('input').fill('Información contextual');

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { flattenFields, formDefinitionSchema, FormDefinition, Json, RuntimeFormResponse, validateDefinition } from '@tramites/form-contracts';
+import { flattenFields, formDefinitionSchema, FormDefinition, Json, REQUIRED_CONFLICT_MESSAGE, RuntimeFormResponse, validateDefinition } from '@tramites/form-contracts';
 import { badRequest, conflict, notFound } from './http-error';
 import { SupabaseService } from './supabase.service';
 import { TipificationRegistry } from './tipification.registry';
@@ -29,7 +29,10 @@ export class FormsService {
 
   async getDraft(publicId: string) {
     const form = await this.findForm(publicId);
-    return { formId: form.public_id, name: form.name, definition: this.parseDefinition(form.draft_definition), updatedAt: form.updated_at };
+    // Un borrador legado puede traer las dos formas de obligatoriedad. Se lo
+    // devolvemos al editor para que pueda corregirlo; guardar y publicar siguen
+    // usando parseDefinition y, por lo tanto, no permiten persistirlo otra vez.
+    return { formId: form.public_id, name: form.name, definition: this.parseDefinitionForEditing(form.draft_definition), updatedAt: form.updated_at };
   }
 
   async updateDraft(publicId: string, input: { name?: string; definition: unknown }) {
@@ -100,8 +103,17 @@ export class FormsService {
     return result.data;
   }
 
+  private parseDefinitionForEditing(value: unknown): FormDefinition {
+    const result = formDefinitionSchema.safeParse(value);
+    if (result.success) return result.data;
+    if (result.error.issues.length > 0 && result.error.issues.every((issue) => issue.message === REQUIRED_CONFLICT_MESSAGE)) {
+      return value as FormDefinition;
+    }
+    badRequest('La definición del formulario no es válida', result.error.flatten());
+  }
+
   private toSummary(form: FormRow) {
-    const definition = this.parseDefinition(form.draft_definition);
+    const definition = this.parseDefinitionForEditing(form.draft_definition);
     return { id: form.public_id, name: form.name, title: definition.title, published: Boolean(form.published_version_id), updatedAt: form.updated_at };
   }
 }
