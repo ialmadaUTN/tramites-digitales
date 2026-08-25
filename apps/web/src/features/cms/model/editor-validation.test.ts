@@ -184,3 +184,44 @@ describe('obligatoriedad fija frente a la condicional', () => {
     expect(errors.hasErrors).toBe(false);
   });
 });
+
+describe('solo lectura y obligatoriedad condicional', () => {
+  const gate = { id: 'gate', fieldName: 'gate', type: 'text' as const, label: 'Gate', width: 'full' as const, rules: {} };
+  const pointsAtGate = { logic: 'all' as const, rules: [{ fieldId: 'gate', operator: 'notEmpty' as const }] };
+
+  function build(target: Record<string, unknown>): FormDefinition {
+    return {
+      schemaVersion: 2,
+      tipificationKey: 'generic@v1',
+      title: 'Demo',
+      submitLabel: 'Enviar',
+      containers: [{
+        id: 'c1',
+        title: 'Uno',
+        kind: 'section',
+        columns: 1,
+        fields: [gate, { id: 'f1', fieldName: 'campo', type: 'text', label: 'Campo', width: 'full', rules: {}, ...target }],
+      }],
+    } as FormDefinition;
+  }
+
+  it('marca la obligatoriedad condicional sobre un campo de solo lectura sin default', () => {
+    // Sin valor por defecto nadie puede completarlo cuando la condición se cumple.
+    const errors = collectDefinitionEditorErrors(build({ readOnly: true, conditions: { required: pointsAtGate } }), 'Demo');
+    expect(errors.fields.f1?.readOnly).toBe('Un campo obligatorio de solo lectura necesita un valor por defecto');
+    expect(errors.hasErrors).toBe(true);
+  });
+
+  it('con valor por defecto la combinación es válida', () => {
+    const errors = collectDefinitionEditorErrors(
+      build({ readOnly: true, defaultValue: 'fijo', conditions: { required: pointsAtGate } }),
+      'Demo',
+    );
+    expect(errors.fields.f1).toBeUndefined();
+  });
+
+  it('un campo editable con obligatoriedad condicional no necesita default', () => {
+    const errors = collectDefinitionEditorErrors(build({ conditions: { required: pointsAtGate } }), 'Demo');
+    expect(errors.fields.f1).toBeUndefined();
+  });
+});

@@ -2,8 +2,8 @@ import { z } from 'zod';
 export type { Database, Json } from './database.types.js';
 export { FIELD_NAME_INVALID_MESSAGE, FIELD_NAME_PATTERN, fieldNameError } from './field-name.js';
 import { FIELD_NAME_INVALID_MESSAGE, FIELD_NAME_PATTERN } from './field-name.js';
-export { REQUIRED_CONFLICT_MESSAGE, hasRequiredConflict } from './required-semantics.js';
-import { hasRequiredConflict, REQUIRED_CONFLICT_MESSAGE } from './required-semantics.js';
+export { REQUIRED_CONFLICT_MESSAGE, canBecomeRequired, hasRequiredConflict } from './required-semantics.js';
+import { canBecomeRequired, hasRequiredConflict, REQUIRED_CONFLICT_MESSAGE } from './required-semantics.js';
 
 export const fieldTypeSchema = z.enum([
   'text',
@@ -403,7 +403,10 @@ export const formDefinitionSchema = z
         if (field.readOnly && READ_ONLY_UNSUPPORTED_FIELD_TYPES.includes(field.type)) {
           ctx.addIssue({ code: 'custom', path: [...fieldPath, 'readOnly'], message: `${field.type} no admite solo lectura` });
         }
-        if (field.readOnly && field.rules.required && field.defaultValue === undefined) {
+        // `canBecomeRequired` y no `rules.required`: con obligatoriedad condicional
+        // el campo se exige cuando la condición se cumple, y al ser de solo lectura
+        // nadie puede completarlo. Sin default, el formulario queda imposible de enviar.
+        if (field.readOnly && canBecomeRequired(field) && field.defaultValue === undefined) {
           ctx.addIssue({ code: 'custom', path: [...fieldPath, 'defaultValue'], message: 'Un campo obligatorio de solo lectura necesita un valor por defecto' });
         }
         if (field.readOnly && !isV2) {

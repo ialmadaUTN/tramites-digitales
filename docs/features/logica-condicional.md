@@ -82,6 +82,12 @@ Hay dos formas de declarar que un campo es obligatorio, y **son excluyentes**:
 
 **Declarar las dos está prohibido.** Es ambiguo y falla en silencio: la fija gana y la condición queda muerta, así que el autor cree haber configurado *"obligatorio cuando X"* y en realidad configuró *"siempre obligatorio"*. El contrato lo rechaza aunque se llame a la API directamente, y el editor deshabilita la opción que sobra en cuanto una de las dos está activa.
 
+Con una excepción deliberada: si una definición **ya trae las dos** —guardada antes de esta regla—, el editor **no bloquea ninguna**, para que se pueda desmarcar una y repararla. Bloquear ambas la dejaría sin salida: no se puede guardar por el conflicto y no se puede resolver el conflicto. Apenas queda una sola activa, el bloqueo vuelve.
+
+### Solo lectura y obligatoriedad
+
+Un campo de solo lectura que **pueda llegar a exigirse** necesita `defaultValue`, y eso incluye la obligatoriedad **condicional**, no solo la fija. El campo no se puede completar, así que sin valor por defecto el formulario queda imposible de enviar en cuanto la condición se cumple — y el problema aparecería recién en runtime. La regla está en `canBecomeRequired` (`packages/form-contracts/src/required-semantics.ts`) y la aplican el contrato y el editor.
+
 ### La obligatoriedad sí convive con las otras condiciones
 
 Un campo obligatorio con visibilidad, inclusión o habilitación condicional es una configuración legítima y significa:
@@ -129,3 +135,4 @@ Los campos ocultos o excluidos no se validan ni viajan. Un campo deshabilitado n
 - **2026-08-20** — El editor pasó de una única regla con cuatro operadores a reglas múltiples con los diez operadores del contrato, selector visual de lógica `all`/`any` y valores múltiples para `in`/`notIn`. Se corrigió el selector de campos candidatos, que ofrecía celdas de grilla y producía definiciones que el BFF rechazaba.
 - **2026-08-21** — Se agregaron definiciones v3, variables externas tipadas, grupos anidados, inclusión independiente, condiciones jerárquicas y revalidación mediante contexto firmado en el BFF.
 - **2026-08-21** — Se fijó la compatibilidad entre obligatoriedad fija y lógica condicional. Declarar `rules.required` junto con `conditions.required` pasó a ser inválido: el contrato lo rechaza aunque se llame a la API directamente, y el editor deshabilita la opción que sobra. La obligatoriedad fija con visibilidad, inclusión o habilitación condicional queda definida como "obligatorio cuando está visible, incluido y habilitado".
+- **2026-08-22** — Revisión técnica. La exigencia de `defaultValue` en campos de solo lectura pasó a cubrir la obligatoriedad condicional además de la fija. Y cuando una definición ya trae las dos obligatoriedades, el editor deja de bloquear ambas para que se pueda desmarcar una y repararla.

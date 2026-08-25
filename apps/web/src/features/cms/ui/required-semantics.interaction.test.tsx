@@ -98,3 +98,51 @@ describe('editor de campo · obligatoriedad fija y condicional', () => {
     expect(screen.getByText(/Obligatorio siempre que el campo esté visible y habilitado/)).toBeTruthy();
   });
 });
+
+/**
+ * Una definición guardada antes de la regla de exclusividad puede traer las dos
+ * obligatoriedades. Si el editor deshabilitara ambas —cada una por detectar a la
+ * otra— esa definición quedaría irreparable: no se puede guardar por el conflicto
+ * y no se puede desmarcar nada para resolverlo.
+ */
+describe('editor de campo · reparar una definición conflictiva', () => {
+  const conflictiva = { rules: { required: true }, conditions: { required: pointsAtGate } };
+
+  it('con las dos activas, ninguna queda bloqueada', () => {
+    render(<Harness initial={definitionWith(conflictiva)} />);
+
+    expect(screen.getByLabelText('Obligatorio').hasAttribute('disabled')).toBe(false);
+    expect(screen.getByLabelText('Obligatoriedad condicional').hasAttribute('disabled')).toBe(false);
+  });
+
+  it('desmarcar la fija repara la definición y el contrato la acepta', async () => {
+    render(<Harness initial={definitionWith(conflictiva)} />);
+
+    await userEvent.click(screen.getByLabelText('Obligatorio'));
+
+    const target = produced();
+    expect(target.rules.required).toBeFalsy();
+    expect(target.conditions?.required).toBeDefined();
+    expect(formDefinitionSchema.safeParse(definitionWith(target)).success).toBe(true);
+  });
+
+  it('desmarcar la condicional también repara', async () => {
+    render(<Harness initial={definitionWith(conflictiva)} />);
+
+    await userEvent.click(screen.getByLabelText('Obligatoriedad condicional'));
+
+    const target = produced();
+    expect(target.conditions?.required).toBeUndefined();
+    expect(target.rules.required).toBe(true);
+    expect(formDefinitionSchema.safeParse(definitionWith(target)).success).toBe(true);
+  });
+
+  it('una vez reparada, vuelve a bloquearse la opción que sobra', async () => {
+    // El bloqueo tiene que volver, si no se podría recrear el conflicto.
+    render(<Harness initial={definitionWith(conflictiva)} />);
+
+    await userEvent.click(screen.getByLabelText('Obligatoriedad condicional'));
+
+    expect(screen.getByLabelText('Obligatoriedad condicional').hasAttribute('disabled')).toBe(true);
+  });
+});

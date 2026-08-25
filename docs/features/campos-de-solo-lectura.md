@@ -40,7 +40,7 @@ La decisión de diseño es **ignorar** el valor manipulado, no rechazar el enví
 | Regla | Motivo |
 | --- | --- |
 | `fileUpload` no admite solo lectura | No hay forma de precargar un archivo como valor por defecto. |
-| Un campo de solo lectura **obligatorio** necesita `defaultValue` | Si no, es un campo imposible de completar: obligatorio y no editable, sin valor. |
+| Un campo de solo lectura que **pueda llegar a exigirse** necesita `defaultValue` | Si no, es un campo imposible de completar: exigido y no editable, sin valor. Cuenta la obligatoriedad **fija y la condicional**: con la condicional el problema aparecería recién en runtime, cuando la condición se cumple. Lo decide `canBecomeRequired` en `packages/form-contracts/src/required-semantics.ts`. |
 | Requiere `schemaVersion: 2` | Un formulario v1 publicado no conoce esta propiedad. |
 | Si al cambiar de tipo el valor por defecto no sobrevive, **no** se desmarca "Solo lectura" | Desmarcarlo a espaldas del autor sería peor que mostrarle el error; el editor reporta "Un campo obligatorio de solo lectura necesita un valor por defecto" y él decide. |
 
@@ -60,3 +60,4 @@ Las tres primeras las verifica el contrato al guardar y el editor antes de guard
 ## Historial de cambios
 
 - **2026-08-20** — Se agregó la funcionalidad: propiedad `readOnly` en el contrato, casilla en el editor (incluidas columnas de grilla), bloqueo diferenciado por tipo de control en el runtime, y sustitución del valor recibido por el declarado en la validación del envío.
+- **2026-08-22** — La exigencia de `defaultValue` pasó a cubrir también la obligatoriedad condicional: antes solo miraba la fija, así que un campo de solo lectura con obligatoriedad condicional se podía publicar y quedaba imposible de completar cuando la condición se cumplía.

@@ -153,6 +153,16 @@ export function FieldEditor({ field, index, definition, containerId: _containerI
   const acceptsReadOnly = !READ_ONLY_BLOCKED_FIELD_TYPES.includes(field.type);
   const fixedRequired = Boolean(field.rules.required);
   const conditionalRequired = Boolean(field.conditions?.required);
+  /**
+   * Cada opción se deshabilita solo si la **otra** está activa y ella no.
+   *
+   * Si se deshabilitaran ambas cuando las dos están marcadas, una definición
+   * guardada antes de esta regla quedaría irreparable: el editor bloquea guardar
+   * por el conflicto y no deja desmarcar ninguna de las dos para resolverlo.
+   */
+  const requiredConflict = fixedRequired && conditionalRequired;
+  const lockFixedRequired = conditionalRequired && !requiredConflict;
+  const lockConditionalRequired = fixedRequired && !requiredConflict;
 
   return (
     <div className={`field-editor${fieldErrors ? ' has-error' : ''}`}>
@@ -539,11 +549,11 @@ export function FieldEditor({ field, index, definition, containerId: _containerI
         {/* Obligatoriedad fija y condicional son excluyentes: tenerlas juntas es
             ambiguo y la fija gana en silencio. Se deshabilita la que sobra en vez
             de dejar configurar algo que el contrato después rechaza. */}
-        <label title={conditionalRequired ? REQUIRED_CONFLICT_MESSAGE : undefined}>
+        <label title={lockFixedRequired || requiredConflict ? REQUIRED_CONFLICT_MESSAGE : undefined}>
           <input
             type="checkbox"
             checked={Boolean(field.rules.required)}
-            disabled={conditionalRequired}
+            disabled={lockFixedRequired}
             onChange={(event) => change((current) => setFieldRule(current, 'required', event.target.checked))}
           />
           Obligatorio
@@ -576,7 +586,7 @@ export function FieldEditor({ field, index, definition, containerId: _containerI
               />
               Habilitación condicional
             </label>
-            <label title={fixedRequired ? REQUIRED_CONFLICT_MESSAGE : undefined}>
+            <label>
               <input
                 type="checkbox"
                 checked={Boolean(field.conditions?.included)}
@@ -584,11 +594,11 @@ export function FieldEditor({ field, index, definition, containerId: _containerI
               />
               Inclusión condicional
             </label>
-            <label>
+            <label title={lockConditionalRequired || requiredConflict ? REQUIRED_CONFLICT_MESSAGE : undefined}>
               <input
                 type="checkbox"
                 checked={Boolean(field.conditions?.required)}
-                disabled={fixedRequired}
+                disabled={lockConditionalRequired}
                 onChange={(event) => toggleCondition('required', event.target.checked)}
               />
               Obligatoriedad condicional

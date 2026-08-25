@@ -2,7 +2,7 @@ import type { ConditionGroup, ConditionRule, ExternalVariable, FormContainer, Fo
 import { containerFields } from '@tramites/form-contracts/field-rules';
 import { duplicateOptionValues, isMaskCompatible, isValidRegexPattern, optionCatalogIncludes } from '@tramites/form-contracts/field-rules';
 import { fieldNameError } from '@tramites/form-contracts/field-name';
-import { hasRequiredConflict, REQUIRED_CONFLICT_MESSAGE } from '@tramites/form-contracts/required-semantics';
+import { canBecomeRequired, hasRequiredConflict, REQUIRED_CONFLICT_MESSAGE } from '@tramites/form-contracts/required-semantics';
 import { validateFieldDefaultValue } from '@tramites/form-contracts/default-value-validation';
 import {
   LENGTH_RULE_FIELD_TYPES,
@@ -140,7 +140,10 @@ function ruleErrors(field: FormField): Pick<FieldEditorErrors, 'pattern' | 'leng
 function readOnlyError(field: FormField): string | undefined {
   if (!field.readOnly) return undefined;
   if (READ_ONLY_BLOCKED_FIELD_TYPES.includes(field.type)) return 'Este tipo de campo no admite solo lectura';
-  if (field.rules.required && field.defaultValue === undefined) {
+  // Cualquier obligatoriedad que pueda aplicarse, fija o condicional: al ser de
+  // solo lectura nadie puede completar el campo, así que sin default el
+  // formulario queda imposible de enviar cuando la condición se cumple.
+  if (canBecomeRequired(field) && field.defaultValue === undefined) {
     return 'Un campo obligatorio de solo lectura necesita un valor por defecto';
   }
   return undefined;

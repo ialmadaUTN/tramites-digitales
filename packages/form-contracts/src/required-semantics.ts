@@ -29,3 +29,16 @@ export const REQUIRED_CONFLICT_MESSAGE =
 export function hasRequiredConflict(field: Pick<FormField, 'rules' | 'conditions'>): boolean {
   return Boolean(field.rules.required) && Boolean(field.conditions?.required);
 }
+
+/**
+ * El campo puede llegar a exigirse, por cualquiera de las dos vías.
+ *
+ * Es lo que hay que mirar para decidir si un campo de solo lectura necesita
+ * `defaultValue`: si solo se consultara `rules.required`, un campo de solo
+ * lectura con obligatoriedad **condicional** pasaría la validación y, cuando la
+ * condición se cumpliera en runtime, quedaría exigido sin que nadie pueda
+ * completarlo. El formulario se vuelve imposible de enviar.
+ */
+export function canBecomeRequired(field: Pick<FormField, 'rules' | 'conditions'>): boolean {
+  return Boolean(field.rules.required) || Boolean(field.conditions?.required);
+}

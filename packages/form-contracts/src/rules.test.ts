@@ -277,3 +277,52 @@ describe('obligatoriedad fija frente a las condiciones', () => {
     expect(definitionErrors(twoFields(target))).toBe('');
   });
 });
+
+/**
+ * Solo lectura frente a la obligatoriedad condicional.
+ *
+ * El campo no se puede completar, así que si llega a exigirse sin `defaultValue`
+ * el formulario queda imposible de enviar. La regla mira **cualquier** vía de
+ * obligatoriedad, no solo la fija: con la condicional el problema aparece recién
+ * en runtime, cuando la condición se cumple.
+ */
+describe('solo lectura y obligatoriedad condicional', () => {
+  const gate = { id: 'gate', fieldName: 'gate', type: 'text', label: 'Gate', width: 'full', rules: {} };
+  const pointsAtGate = { logic: 'all', rules: [{ fieldId: 'gate', operator: 'notEmpty' }] };
+
+  function twoFields(target: Record<string, unknown>) {
+    return {
+      schemaVersion: 2,
+      tipificationKey: 'generic@v1',
+      title: 'Reglas',
+      submitLabel: 'Enviar',
+      containers: [{
+        id: 'c1',
+        title: 'Uno',
+        kind: 'section',
+        columns: 1,
+        fields: [gate, { id: 'f1', fieldName: 'campo', type: 'text', label: 'Campo', width: 'full', rules: {}, ...target }],
+      }],
+    };
+  }
+
+  const cases: [string, Record<string, unknown>, RegExp | undefined][] = [
+    // El caso que se colaba: obligatoriedad condicional sobre un campo de solo
+    // lectura sin valor por defecto.
+    ['condicional sin default', { readOnly: true, conditions: { required: pointsAtGate } }, /necesita un valor por defecto/],
+    ['fija sin default', { readOnly: true, rules: { required: true } }, /necesita un valor por defecto/],
+    ['condicional con default', { readOnly: true, defaultValue: 'fijo', conditions: { required: pointsAtGate } }, undefined],
+    ['fija con default', { readOnly: true, defaultValue: 'fijo', rules: { required: true } }, undefined],
+    // Sin obligatoriedad de ningún tipo, el default no hace falta.
+    ['solo lectura sin obligatoriedad', { readOnly: true }, undefined],
+    // Y sin solo lectura, la condicional sin default es perfectamente válida:
+    // el usuario puede completarlo.
+    ['condicional sin solo lectura', { conditions: { required: pointsAtGate } }, undefined],
+  ];
+
+  it.each(cases)('%s', (_name, target, expected) => {
+    const errors = definitionErrors(twoFields(target));
+    if (expected === undefined) expect(errors).toBe('');
+    else expect(errors).toMatch(expected);
+  });
+});
