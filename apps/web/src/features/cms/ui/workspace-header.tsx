@@ -14,11 +14,14 @@ type WorkspaceHeaderProps = {
   status: WorkspaceStatus | null;
   saving: boolean;
   preview: boolean;
+  published: boolean;
+  paused: boolean;
   onNameChange: (name: string) => void;
   onDefinitionChange: (definition: FormDefinition) => void;
   onTogglePreview: () => void;
   onSave: () => void;
   onPublish: () => void;
+  onToggleAvailability: () => void;
 };
 
 export function WorkspaceHeader({
@@ -30,11 +33,14 @@ export function WorkspaceHeader({
   status,
   saving,
   preview,
+  published,
+  paused,
   onNameChange,
   onDefinitionChange,
   onTogglePreview,
   onSave,
   onPublish,
+  onToggleAvailability,
 }: WorkspaceHeaderProps) {
   const [copied, setCopied] = useState(false);
 
@@ -58,6 +64,12 @@ export function WorkspaceHeader({
               </svg>
             </span>
             {copied && <span className="badge badge-success">¡Copiado!</span>}
+            {paused && (
+              <span className="badge badge-danger" title="El runtime no entrega este formulario ni acepta envíos nuevos">
+                <span className="badge-dot" />
+                Pausado
+              </span>
+            )}
           </div>
         </div>
 
@@ -95,6 +107,33 @@ export function WorkspaceHeader({
             </svg>
             Guardar
           </button>
+
+          {/*
+            Pausar solo tiene sentido sobre algo publicado: es lo publicado lo que
+            se saca de circulación. Reactivar, en cambio, se ofrece siempre que el
+            formulario esté pausado, aunque no tenga versión publicada: si no, una
+            fila pausada por fuera del CMS quedaría sin forma de recuperarse.
+          */}
+          {(published || paused) && (
+            <button
+              className={paused ? 'button secondary' : 'button danger'}
+              onClick={onToggleAvailability}
+              disabled={saving}
+              title={paused ? 'Volver a exponer el formulario en el portal' : 'Sacar el formulario de circulación sin despublicarlo'}
+            >
+              {paused ? (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="5 3 19 12 5 21 5 3" />
+                </svg>
+              ) : (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="6" y="4" width="4" height="16" />
+                  <rect x="14" y="4" width="4" height="16" />
+                </svg>
+              )}
+              {paused ? 'Reactivar' : 'Pausar'}
+            </button>
+          )}
 
           <button className="button primary" onClick={onPublish} disabled={saving}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

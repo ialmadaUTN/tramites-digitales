@@ -7,8 +7,8 @@ export default defineConfig({
     include: ['src/**/*.test.ts'],
     coverage: coverage(
       // Piso = lo ya alcanzado sobre la lógica que queda (registry de
-      // tipificación y cliente de Dynamics).
-      { statements: 75, branches: 53, functions: 58, lines: 82 },
+      // tipificación, cliente de Dynamics y disponibilidad del formulario).
+      { statements: 86, branches: 78, functions: 87, lines: 95 },
       [
         // Controllers y servicios que solo orquestan Supabase y HTTP: cubrirlos
         // con mocks termina testeando al mock. El recorrido real es el e2e.

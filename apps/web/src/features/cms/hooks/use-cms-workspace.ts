@@ -93,6 +93,22 @@ export function useCmsWorkspace(api: FormsApi = formsApi) {
     }
   }
 
+  async function toggleAvailability() {
+    if (!selectedId || !selected) return;
+    const pausing = !selected.paused;
+    setSaving(true);
+    setStatus(null);
+    try {
+      await (pausing ? api.pause(selectedId) : api.resume(selectedId));
+      await loadForms();
+      setStatus({ text: pausing ? 'Formulario pausado' : 'Formulario reactivado' });
+    } catch (error) {
+      setStatus({ text: toErrorMessage(error, pausing ? 'No se pudo pausar' : 'No se pudo reactivar'), error: true });
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return {
     forms,
     selected,
@@ -110,5 +126,6 @@ export function useCmsWorkspace(api: FormsApi = formsApi) {
     createForm,
     saveDraft,
     publish,
+    toggleAvailability,
   };
 }

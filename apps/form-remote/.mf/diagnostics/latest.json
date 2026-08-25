@@ -1,10 +1,10 @@
 {
   "latestErrorEvent": {
     "code": "TYPE-001",
-    "message": "Failed to generate type declaration. Execute the below cmd to reproduce and fix the error. #TYPE-001\nargs: {\"cmd\":\"C:\\\\Users\\\\ialma\\\\AppData\\\\Local\\\\Programs\\\\nodejs\\\\node.exe C:\\\\Users\\\\ialma\\\\Desktop\\\\Nacho\\\\Programacion\\\\TramitesDigitales\\\\node_modules\\\\.pnpm\\\\typescript@7.0.2\\\\node_modules\\\\typescript\\\\bin\\\\tsc --project C:\\\\Users\\\\ialma\\\\Desktop\\\\Nacho\\\\Programacion\\\\TramitesDigitales\\\\apps\\\\form-remote\\\\node_modules\\\\.federation\\\\tsconfig.16b95650be532a92584494ba7f4492aa.json\"}\nView the docs to see how to solve: https://module-federation.io/guide/troubleshooting/type#type-001",
+    "message": "Failed to generate type declaration. Execute the below cmd to reproduce and fix the error. #TYPE-001\nargs: {\"cmd\":\"\\\"C:\\\\\\\\Program Files\\\\\\\\nodejs\\\\\\\\node.exe\\\" C:\\\\Users\\\\under_the_influence\\\\Desktop\\\\proyectos\\\\tramites-digitales\\\\node_modules\\\\.pnpm\\\\typescript@7.0.2\\\\node_modules\\\\typescript\\\\bin\\\\tsc --project C:\\\\Users\\\\under_the_influence\\\\Desktop\\\\proyectos\\\\tramites-digitales\\\\apps\\\\form-remote\\\\node_modules\\\\.federation\\\\tsconfig.6ecac0fddc2625c8b1203a7312dfdf1a.json\"}\nView the docs to see how to solve: https://module-federation.io/guide/troubleshooting/type#type-001",
     "args": {
-      "cmd": "C:\\Users\\ialma\\AppData\\Local\\Programs\\nodejs\\node.exe C:\\Users\\ialma\\Desktop\\Nacho\\Programacion\\TramitesDigitales\\node_modules\\.pnpm\\typescript@7.0.2\\node_modules\\typescript\\bin\\tsc --project C:\\Users\\ialma\\Desktop\\Nacho\\Programacion\\TramitesDigitales\\apps\\form-remote\\node_modules\\.federation\\tsconfig.16b95650be532a92584494ba7f4492aa.json"
+      "cmd": "\"C:\\\\Program Files\\\\nodejs\\\\node.exe\" C:\\Users\\under_the_influence\\Desktop\\proyectos\\tramites-digitales\\node_modules\\.pnpm\\typescript@7.0.2\\node_modules\\typescript\\bin\\tsc --project C:\\Users\\under_the_influence\\Desktop\\proyectos\\tramites-digitales\\apps\\form-remote\\node_modules\\.federation\\tsconfig.6ecac0fddc2625c8b1203a7312dfdf1a.json"
     },
-    "timestamp": 1787209681157
+    "timestamp": 1787264157127
   }
 }
