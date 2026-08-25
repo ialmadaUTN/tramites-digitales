@@ -75,6 +75,10 @@ export class FormsService {
   async pause(publicId: string) {
     const form = await this.findForm(publicId);
     if (form.paused_at) return this.toSummary(form);
+    // Pausar es sacar de circulación lo publicado. Permitirlo sobre un borrador
+    // dejaba un estado que el CMS no sabía deshacer, porque la acción de
+    // reactivar colgaba de que hubiera versión publicada.
+    if (!form.published_version_id) conflict('Solo se puede pausar un formulario publicado');
     return this.setPaused(publicId, new Date().toISOString());
   }
 

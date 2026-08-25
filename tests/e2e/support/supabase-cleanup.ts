@@ -126,3 +126,35 @@ export async function latestE2eSubmissionPayload(publicId: string): Promise<Reco
   if (!submissions[0]) throw new Error(`No se encontró una submission para ${publicId}`);
   return submissions[0].payload;
 }
+
+/**
+ * Inserta una submission **directamente** contra PostgREST, sin pasar por el BFF.
+ * Es la única forma de comprobar que el guard de disponibilidad vive en el
+ * esquema y no en el servicio: si estuviera solo en el BFF, este insert entraría.
+ */
+export async function insertSubmissionDirectly(
+  formPublicId: string,
+  idempotencyKey: string,
+): Promise<{ status: number; body: string }> {
+  const config = getConfig();
+  const formResponse = await fetch(
+    `${config.url}/rest/v1/forms?select=id,published_version_id&public_id=eq.${encodeURIComponent(formPublicId)}`,
+    { headers: headers(config, 'accept') },
+  );
+  await assertResponse(formResponse, 'Buscar el formulario');
+  const [form] = (await formResponse.json()) as Array<{ id: number; published_version_id: number | null }>;
+  if (!form) throw new Error(`No existe el formulario ${formPublicId}`);
+
+  const response = await fetch(`${config.url}/rest/v1/submissions`, {
+    method: 'POST',
+    headers: { ...headers(config, 'content'), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      form_id: form.id,
+      form_version_id: form.published_version_id,
+      idempotency_key: idempotencyKey,
+      payload: {},
+    }),
+  });
+
+  return { status: response.status, body: await response.text() };
+}

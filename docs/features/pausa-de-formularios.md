@@ -22,13 +22,16 @@ La pausa es un **eje independiente de la publicación**. Un formulario pausado c
 
 ### El punto único de control
 
-Los tres caminos de runtime pasan por `FormsService.runtime()`, así que el chequeo vive ahí y los cubre a los tres:
+Los cuatro caminos de runtime pasan por `FormsService.runtime()`, así que el chequeo vive ahí y los cubre a todos:
 
 | Entrada | Cómo llega |
 | --- | --- |
 | `GET /api/v1/runtime/forms/:formId` | `RuntimeController.runtime()` |
 | `POST /api/v1/runtime/forms/:formId/submissions` | `SubmissionsService.submit()` |
 | `POST /api/v1/runtime/forms/:formId/uploads` | `UploadsService.createUpload()` |
+| `POST /api/v1/runtime/forms/:formId/uploads/:id/complete` | `UploadsService.completeUpload()` |
+
+Para las submissions ese chequeo es necesario pero **no suficiente**: la garantía real la da el trigger de la base, más abajo.
 
 La validación es **del lado del servidor**. El CMS y el renderer muestran el estado, pero no son los que lo aplican: un cliente que llame al BFF directamente recibe el mismo rechazo.
 
@@ -41,6 +44,7 @@ La validación es **del lado del servidor**. El CMS y el renderer muestran el es
 | Submission nueva | **409**, y no se escribe ninguna fila |
 | Reintento con una `Idempotency-Key` ya usada | **Permitido**, devuelve el receipt original (ver abajo) |
 | Abrir una carga de archivo | **409** |
+| Completar una carga ya abierta | **409.** La carga pudo empezar antes de la pausa, pero completarla no puede desembocar en nada —la submission se rechaza igual— y sí escribiría en storage. "Pausado" significa lo mismo en los cuatro caminos de runtime. |
 | `POST /api/v1/submissions/:id/delivery/retry` | **Permitido.** Reintentar la entrega a Dynamics no es iniciar una submission: lo que se reintenta ya fue aceptado y el cliente ya tiene su número de gestión. |
 | Editar y guardar el borrador | **Permitido** |
 | Publicar una versión nueva | **Permitido, y no reactiva.** Reactivar por efecto secundario de otra acción es cómo se expone un formulario sin querer. |
@@ -63,6 +67,31 @@ El front discrimina por `code`, no por el status.
 
 `Este formulario no está disponible en este momento`, exportado como `FORM_PAUSED_MESSAGE` en `apps/bff/src/http-error.ts`. **Es el BFF quien lo define**; el renderer lo muestra tal cual y no lo duplica como literal, para que no puedan quedar dos textos distintos.
 
+### Qué se puede pausar
+
+Solo un formulario **con versión publicada**: pausar es sacar de circulación lo publicado. `pause()` rechaza el resto con 409.
+
+Reactivar, en cambio, se permite siempre que `paused_at` esté presente, tenga o no versión publicada, y el CMS muestra el botón con el mismo criterio. Es deliberado: antes de esta regla un consumidor de la API podía dejar un borrador pausado, y la acción de reactivar colgaba de que hubiera versión publicada, así que esa fila quedaba sin forma de recuperarse desde la UI.
+
+## La pausa es atómica con el alta de la submission
+
+El chequeo del BFF **no alcanza por sí solo**. Entre `forms.runtime()` y el insert hay varias operaciones de I/O —verificación del token de contexto, validación del payload, lookup de la versión y de los adjuntos—, así que una pausa que ocurra en esa ventana dejaría entrar la submission después de que el cliente que pausó ya recibió una respuesta correcta.
+
+La decisión final la toma el trigger `submissions_reject_when_form_paused`, dentro de la misma transacción que el insert:
+
+```sql
+select paused_at into form_paused_at from public.forms where id = new.form_id for share;
+```
+
+El `for share` es lo que da atomicidad, no solo una ventana más chica:
+
+- Si la pausa todavía no commiteó, el trigger toma el lock compartido y el `update forms set paused_at` **espera** a que el insert termine. La submission entra y el formulario queda pausado después: orden consistente.
+- Si la pausa ya commiteó, el trigger ve `paused_at` y rechaza con SQLSTATE `TD001`, que el BFF traduce al mismo 409 `FORM_PAUSED`.
+
+Vive en el esquema y no en el servicio para que la garantía valga para **cualquier cliente y cualquier camino**, incluido un insert directo contra PostgREST. Eso es lo que verifica `tests/e2e/pause-guard.spec.ts`, que saltea el BFF a propósito.
+
+Un error de insert que no sea `TD001` **no** se traduce a 409: enmascarar cualquier fallo como "pausado" escondería incidentes reales.
+
 ## Consistencia ante caché, reintentos y sesiones abiertas
 
 Tres casos que se resolvieron explícitamente, porque son los que hacen que una implementación pase los tests obvios y falle en producción:
@@ -77,7 +106,10 @@ Tres casos que se resolvieron explícitamente, porque son los que hacen que una 
 
 El listado rotula cada formulario con **precedencia pausado > publicado > borrador** (`apps/web/src/features/cms/model/availability.ts`). Un formulario pausado conserva su versión publicada, así que mostrarlo como "Publicado" haría creer que sigue disponible en el portal.
 
-El botón Pausar/Reactivar aparece en el encabezado del workspace **solo si el formulario tiene versión publicada**: pausar es sacar de circulación lo publicado, y sin nada publicado no hay nada que pausar.
+El botón del encabezado del workspace aparece cuando el formulario **está publicado o está pausado**:
+
+- **Pausar** solo con versión publicada, porque es lo publicado lo que se saca de circulación.
+- **Reactivar** siempre que esté pausado, aunque no tenga versión publicada, para poder recuperar una fila que haya quedado en ese estado.
 
 ## Restricciones y puntos abiertos
 
@@ -91,6 +123,7 @@ El botón Pausar/Reactivar aparece en el encabezado del workspace **solo si el f
 
 | Qué | Dónde |
 | --- | --- |
+| Guard atómico en la base | `supabase/migrations/20260822120000_pause_guard_submissions.sql` |
 | Regla de disponibilidad | `apps/bff/src/form-availability.ts` |
 | Error y mensaje | `apps/bff/src/http-error.ts` (`formPaused`, `FORM_PAUSED_MESSAGE`) |
 | Chequeo en runtime, `pause()` y `resume()` | `apps/bff/src/forms.service.ts` |
@@ -105,3 +138,4 @@ El botón Pausar/Reactivar aparece en el encabezado del workspace **solo si el f
 ## Historial de cambios
 
 - **2026-08-20** — Primera versión. Un formulario publicado se puede pausar y reactivar desde el CMS. El BFF responde 409 `FORM_PAUSED` en los tres caminos de runtime, la preview del borrador sigue habilitada, el reintento idempotente devuelve el receipt original y el reintento de entrega a Dynamics no se bloquea. De paso se corrigió el parseo de errores del renderer, que mostraba el JSON crudo de la respuesta en vez del `message`.
+- **2026-08-22** — Revisión técnica. La pausa pasó a ser atómica con el alta de submissions mediante un trigger con `for share`, porque el chequeo del BFF corre varias operaciones de I/O antes del insert. Completar una carga ya abierta sobre un formulario pausado dejó de estar permitido. Pausar exige versión publicada, y el CMS ofrece reactivar siempre que el formulario esté pausado, para recuperar filas que hayan quedado en ese estado.

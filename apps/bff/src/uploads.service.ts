@@ -89,6 +89,11 @@ export class UploadsService implements OnModuleInit {
 
   async completeUpload(formId: string, uploadId: string, sessionKey: string): Promise<UploadReference> {
     this.assertEnabled();
+    // También acá, no solo al abrir la carga: completarla sobre un formulario
+    // pausado no puede desembocar en nada —la submission se rechaza igual— pero
+    // escribe en storage y deja la carga en `ready`. "Pausado" tiene que
+    // significar lo mismo en los cuatro caminos de runtime.
+    await this.forms.runtime(formId, 'published');
     const upload = await this.findOwnedUpload(formId, uploadId, sessionKey);
     if (upload.status !== 'pending') badRequest('La carga no está pendiente');
     if (new Date(upload.expires_at).getTime() < Date.now()) badRequest('La carga expiró');

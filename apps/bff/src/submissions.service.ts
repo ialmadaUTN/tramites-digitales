@@ -1,7 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { cleanSubmissionPayload, FormDefinition, FormValue, Json, SubmissionReceipt } from '@tramites/form-contracts';
 import { validateSubmission } from '@tramites/form-contracts/validation';
-import { badRequest, conflict, notFound } from './http-error';
+import { FORM_PAUSED_SQLSTATE } from './form-availability';
+import { badRequest, conflict, formPaused, notFound } from './http-error';
 import { FormsService } from './forms.service';
 import { SupabaseService } from './supabase.service';
 import { DeliveryResult, DynamicsClient } from './dynamics.client';
@@ -71,6 +72,10 @@ export class SubmissionsService {
         const existing = await this.findByIdempotency(form.id, idempotencyKey);
         if (existing) return this.toReceipt(existing, publicId, runtime.version ?? 1);
       }
+      // El formulario se pausó entre la validación y el insert. El chequeo de
+      // arriba no alcanza —hay varias operaciones de I/O en el medio— así que la
+      // decisión final la toma el trigger, dentro de la misma transacción.
+      if (error?.code === FORM_PAUSED_SQLSTATE) formPaused();
       throw new Error(error?.message ?? 'No se pudo guardar la submission');
     }
 
