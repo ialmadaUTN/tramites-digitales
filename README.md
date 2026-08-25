@@ -60,6 +60,8 @@ $env:E2E_MANAGED_SERVERS = 'true'
 pnpm test:e2e
 ```
 
+Los E2E son obligatorios para todo cambio funcional. Cada PR debe crear o actualizar un recorrido E2E que valide la funcionalidad y `pnpm test:e2e` debe pasar completo; en CI, la ausencia de `SUPABASE_URL` o `SUPABASE_SECRET_KEY` hace fallar el job en lugar de saltearlo.
+
 El browser no accede a las tablas de Supabase ni conoce la clave secreta. Para adjuntos, cuando las tres flags de seguridad están activas, el BFF emite una URL firmada y el browser sube directamente el binario al bucket privado; la confirmación, validación de metadata y asociación a la submission siguen pasando por el BFF.
 
 Los adjuntos permanecen deshabilitados por defecto (`FORM_UPLOADS_ENABLED=false`, `FORM_UPLOADS_AUTHENTICATED=false`, `FORM_UPLOADS_MALWARE_SCANNED=false`). Antes de activarlos en un ambiente real hay que conectar la autenticación del template corporativo y el análisis antimalware; el `X-Upload-Session` del prototipo local no reemplaza esa autenticación.
