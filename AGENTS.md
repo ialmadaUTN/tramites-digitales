@@ -114,18 +114,18 @@ La forma importa más que el porcentaje.
 - **Testing Library + jsdom** en `apps/web` y `apps/form-remote`. Los archivos que necesitan DOM lo declaran con `// @vitest-environment jsdom` en la primera línea; no hace falta tocar la config.
 - **Playwright** para los e2e, en `tests/e2e/`.
 
-### End to end: pocos y de recorrido completo
+### End to end: obligatorios, pocos y de recorrido completo
 
-Los e2e levantan cuatro servidores y pegan contra un Supabase real. Pedir uno por feature los vuelve lentos, frágiles, y deja afuera a cualquiera que no tenga credenciales.
+Los e2e levantan cuatro servidores y pegan contra un Supabase real. Son un gate obligatorio de cada cambio funcional: el PR no está terminado ni se puede considerar mergeable si no existe un E2E que valide la funcionalidad y la suite `pnpm test:e2e` no pasa completa.
 
-La regla es otra: **un e2e por recorrido de usuario crítico**, no por feature. Un e2e se justifica cuando verifica algo que los tests unitarios estructuralmente no pueden — que la federación, el BFF, la base y el contrato se pongan de acuerdo. Ejemplo: armar un formulario en el CMS, publicarlo, completarlo en el host y verificar que el submission llega bien.
+La regla es: **por cada cambio funcional hay que crear o actualizar al menos un E2E por el recorrido de usuario crítico afectado**, no agregar casos artificiales por cada función interna. El E2E debe atravesar las capas reales que correspondan — contrato, CMS, BFF, base y/o micro-frontend — y comprobar el resultado observable para quien usa la funcionalidad. Los tests unitarios o de integración no reemplazan este requisito.
 
 Hoy hay dos specs en `tests/e2e/`:
 
 - `authoring-journey.spec.ts` — el recorrido completo: crear un formulario en el CMS, configurarlo, publicarlo, completarlo en el host federado y verificar que el submission llega. Es el que verifica que contrato, CMS, BFF, base y micro-frontend se pongan de acuerdo.
 - `form-flow.spec.ts` — carga por ID y creación desde el CMS.
 
-Si tu feature cambia un recorrido existente, actualizá ese e2e. Si abre uno nuevo, agregalo. Si es una regla de validación más, ya está cubierta por las tablas del contrato y no necesita e2e.
+Si tu feature cambia un recorrido existente, actualizá ese e2e. Si abre uno nuevo, agregalo. Incluso una regla de validación necesita un E2E cuando cambia un comportamiento que el usuario puede observar; las tablas del contrato siguen siendo obligatorias, pero no sustituyen el recorrido completo. Los cambios sin comportamiento funcional (por ejemplo, documentación o refactors demostrablemente neutros) son la única excepción y deben indicarlo explícitamente en el PR.
 
 Cuidado con las carreras de hidratación: el CMS es un client component, y un click disparado antes de que hidrate **no hace nada y no falla** — el test sigue y revienta más adelante, en un lugar que no tiene que ver. Esperá una señal de que la app ya está viva (la lista de formularios poblada, un aviso de estado) antes de interactuar.
 
@@ -151,7 +151,7 @@ Lo que falta, en orden de valor:
 `.github/workflows/ci.yml` corre en **cada pull request** y en **cada push a `main`**:
 
 - **`verify`** — instala, corre `pnpm lint` (chequeo de tipos en los cinco paquetes) y `pnpm test:coverage`. Falla si algún paquete baja de su umbral. No necesita secrets, así que corre siempre.
-- **`e2e`** — corre Playwright después de `verify`. Necesita los secrets `SUPABASE_URL` y `SUPABASE_SECRET_KEY` (y opcionalmente `SUPABASE_DB_SCHEMA`); si no están configurados el job **se saltea en vez de fallar**, para que un fork o un clon nuevo no quede con el CI en rojo por algo que no puede resolver.
+- **`e2e`** — corre Playwright después de `verify` y es obligatorio. Necesita los secrets `SUPABASE_URL` y `SUPABASE_SECRET_KEY` (y opcionalmente `SUPABASE_DB_SCHEMA`); si falta una credencial, el job falla explícitamente. No se permite saltear el E2E por falta de configuración.
 
 Los reportes de cobertura y de Playwright quedan como artifacts de la corrida.
 
@@ -189,7 +189,8 @@ Verificar solo con tests no alcanza cuando la feature tiene UI: levantá la app 
 - [ ] Ninguna referencia a archivos, funciones o mensajes quedó desactualizada en los documentos.
 - [ ] Las reglas nuevas están como filas en las tablas de test, con su caso negativo.
 - [ ] Si la feature toca UI, hay un test de interacción sobre lo que produce.
-- [ ] Si cambia o abre un recorrido de usuario crítico, el e2e lo refleja.
+- [ ] Todo cambio funcional tiene un E2E nuevo o actualizado que valida su recorrido real; si no corresponde por ser un cambio sin comportamiento, la excepción está justificada explícitamente.
+- [ ] `pnpm test:e2e` pasa completo y el check `End to end` de CI está en verde.
 - [ ] `pnpm test:coverage` pasa y ningún piso de cobertura bajó.
 - [ ] Rompiste a propósito una regla nueva y confirmaste que el test la agarra.
 - [ ] Si algo quedó afuera, está dicho explícitamente y con el motivo.
