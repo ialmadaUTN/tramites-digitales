@@ -11,23 +11,16 @@ export default defineConfig({
       {
         // Lógica del editor: pura, barata de testear y es la que decide si un
         // formulario se puede guardar. Misma barra que el contrato.
-        'src/features/cms/model/**': { statements: 92, branches: 85, functions: 98, lines: 94 },
-        'src/features/cms/model/**': { statements: 92, branches: 85, functions: 98, lines: 94 },
+        'src/features/cms/model/**': { statements: 92, branches: 85, functions: 98, lines: 95 },
         // UI del editor: se cubre con tests de interacción sobre la definición
         // que produce, no línea por línea. El piso es lo ya alcanzado.
-        'src/features/cms/ui/**': { statements: 52, branches: 66, functions: 47, lines: 55 },
-        // Piso global.
-        statements: 72,
-        branches: 73,
-        functions: 63,
-        lines: 73,
-        'src/features/cms/ui/**': { statements: 58, branches: 70, functions: 51, lines: 63 },
+        'src/features/cms/ui/**': { statements: 61, branches: 72, functions: 55, lines: 66 },
         // Piso global. `hooks/use-cms-workspace.ts` ya está cubierto: decide
         // cuándo se puede guardar, publicar y pausar, y qué aviso ve el autor.
-        statements: 80,
-        branches: 78,
-        functions: 68,
-        lines: 83,
+        statements: 81,
+        branches: 79,
+        functions: 70,
+        lines: 85,
       },
       [
         // Adaptadores sin lógica propia: fetch, federación y config. Su

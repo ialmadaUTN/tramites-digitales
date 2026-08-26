@@ -1,7 +1,5 @@
-import type { ConditionGroup, ConditionRule, FaqBlock, FieldType, FormContainer, FormDefinition, FormField, FormOption } from '@tramites/form-contracts';
-import type { ConditionGroup, ConditionRule, ConditionSource, FieldType, FormContainer, FormDefinition, FormField, FormOption, TextBlock } from '@tramites/form-contracts';
-import { containerFields, textTemplateError } from '@tramites/form-contracts/field-rules';
-import { defaultValuesOutsideCatalog, isMaskCompatible } from '@tramites/form-contracts/field-rules';
+import type { ConditionGroup, ConditionRule, ConditionSource, FaqBlock, FieldType, FormContainer, FormDefinition, FormField, FormOption, TextBlock } from '@tramites/form-contracts';
+import { containerFields, defaultValuesOutsideCatalog, isMaskCompatible, textTemplateError } from '@tramites/form-contracts/field-rules';
 import {
   LENGTH_RULE_FIELD_TYPES,
   OPTION_FIELD_TYPES,

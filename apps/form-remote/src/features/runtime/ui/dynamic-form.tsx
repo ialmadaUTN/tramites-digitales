@@ -141,28 +141,6 @@ export function DynamicForm(props: DynamicFormProps) {
           ))}
         </section>
       )}
-      {runtime.definition.containers.map((container) => (
-        <section className="form-container" key={container.id}>
-          <h2>{container.title}</h2>
-          {container.kind === 'repeater' ? (
-            <DynamicRepeater container={container} control={runtime.control} />
-          ) : (
-            <div className={`field-grid columns-${container.columns}`}>
-              {container.fields.map((field) => (
-                <DynamicField
-                  key={field.id}
-                  field={field}
-                  control={runtime.control}
-                  values={runtime.values}
-                  errors={runtime.errors}
-                  fieldMap={runtime.fieldMap}
-                  uploadFile={runtime.uploadFile}
-                />
-              ))}
-            </div>
-          )}
-        </section>
-      ))}
       {runtime.definition.containers.map((container) => {
         // La habilitación se hereda del formulario igual que la inclusión: si el
         // formulario está deshabilitado, el servidor no exige ningún campo
@@ -178,7 +156,7 @@ export function DynamicForm(props: DynamicFormProps) {
               <DynamicRepeater container={container} control={runtime.control} enabled={containerEnabled} />
             ) : (
               <fieldset disabled={!containerEnabled} style={{ border: 0, padding: 0, margin: 0 }}>
-                <div className={container.columns === 2 ? 'field-grid two-columns' : 'field-grid'}>
+                <div className={`field-grid columns-${container.columns}`}>
                   {(container.items ?? container.fields.map((field) => ({ kind: 'field' as const, field }))).map((item) => renderItem(item, containerEnabled, containerIncluded))}
                 </div>
               </fieldset>

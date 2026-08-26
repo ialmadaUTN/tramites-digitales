@@ -1,7 +1,5 @@
-import type { FaqBlock, FormContainer, FormDefinition, FormField } from '@tramites/form-contracts';
-import type { ConditionGroup, ConditionRule, ExternalVariable, FormContainer, FormDefinition, FormField } from '@tramites/form-contracts';
-import { containerFields } from '@tramites/form-contracts/field-rules';
-import { duplicateOptionValues, isMaskCompatible, isValidRegexPattern, optionCatalogIncludes } from '@tramites/form-contracts/field-rules';
+import type { ConditionGroup, ConditionRule, ExternalVariable, FaqBlock, FormContainer, FormDefinition, FormField } from '@tramites/form-contracts';
+import { containerFields, duplicateOptionValues, isMaskCompatible, isValidRegexPattern, optionCatalogIncludes } from '@tramites/form-contracts/field-rules';
 import { fieldNameError } from '@tramites/form-contracts/field-name';
 import { canBecomeRequired, hasRequiredConflict, REQUIRED_CONFLICT_MESSAGE } from '@tramites/form-contracts/required-semantics';
 import { validateFieldDefaultValue } from '@tramites/form-contracts/default-value-validation';
@@ -404,10 +402,8 @@ export function collectDefinitionEditorErrors(definition: FormDefinition, name?:
   // Lo que bloquea **guardar**: algo mal definido. Se calcula antes de sumar los
   // problemas de completitud, que solo bloquean publicar.
   const hasErrors = Boolean(
-    nameError || titleError || submitLabelError || tipificationKeyError
-      || Object.keys(containers).length || Object.keys(fields).length || Object.keys(faqBlocks).length,
     nameError || titleError || submitLabelError || tipificationKeyError || formConditionError
-      || Object.keys(containers).length || Object.keys(fields).length || Object.keys(textBlocks).length,
+      || Object.keys(containers).length || Object.keys(fields).length || Object.keys(faqBlocks).length || Object.keys(textBlocks).length,
   );
 
   // Completitud estructural, desde el contrato: mismo criterio y mismos mensajes

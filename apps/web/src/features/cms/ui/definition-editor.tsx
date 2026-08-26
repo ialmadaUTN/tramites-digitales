@@ -1,10 +1,24 @@
 'use client';
 
-import type { FormDefinition } from '@tramites/form-contracts';
-import { addContainer, addFaqBlock, addField, moveContainer, removeContainer, updateContainer } from '../model/definition';
 import type { ConditionGroup, FormDefinition } from '@tramites/form-contracts';
 import { containerFields } from '@tramites/form-contracts/field-rules';
-import { addContainer, addExternalVariable, addField, addTextBlock, moveContainer, moveContainerItem, removeContainer, removeExternalVariable, removeTextBlock, setContainerCondition, setFormCondition, updateContainer, updateExternalVariable, updateTextBlock } from '../model/definition';
+import {
+  addContainer,
+  addExternalVariable,
+  addFaqBlock,
+  addField,
+  addTextBlock,
+  moveContainer,
+  moveContainerItem,
+  removeContainer,
+  removeExternalVariable,
+  removeTextBlock,
+  setContainerCondition,
+  setFormCondition,
+  updateContainer,
+  updateExternalVariable,
+  updateTextBlock,
+} from '../model/definition';
 import type { DefinitionEditorErrors } from '../model/editor-validation';
 import { FaqBlockEditor } from './faq-block-editor';
 import { FieldEditor } from './field-editor';

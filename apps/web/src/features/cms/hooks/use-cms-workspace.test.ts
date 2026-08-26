@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { act, renderHook } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FormDefinition } from '@tramites/form-contracts';
 import type { DraftResponse, FormsApi, FormSummary } from '../api/forms-api';
+import { INITIAL_DEFINITION } from '../model/constants';
 import { useCmsWorkspace } from './use-cms-workspace';
 
 function definition(title: string): FormDefinition {
@@ -83,13 +84,6 @@ describe('useCmsWorkspace: cambios sin guardar al cambiar de formulario', () => 
   });
 });
 
-// @vitest-environment jsdom
-import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { FormDefinition } from '@tramites/form-contracts';
-import type { FormsApi, FormSummary } from '../api/forms-api';
-import { INITIAL_DEFINITION } from '../model/constants';
-import { useCmsWorkspace } from './use-cms-workspace';
 
 /**
  * El hook decide cuándo se puede guardar, publicar y pausar, y qué aviso ve el
