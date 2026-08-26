@@ -74,11 +74,21 @@ test('un formulario creado en el CMS se publica y se completa en el host', async
   await nombre.locator('.form-group').filter({ hasText: 'Etiqueta visible (Label)' }).locator('input').fill('Nombre completo');
 
   // --- Contexto externo y bloque informativo ------------------------------
-  await page.getByRole('button', { name: /Agregar variable externa/ }).click();
+  // Cada click re-renderiza todo el editor y la fila nueva se inserta arriba
+  // del botón, corriéndolo de posición. Si el segundo click sale antes de que
+  // React confirme el primer estado, Playwright compite contra un layout
+  // todavía en movimiento (o un handler que todavía no ve la variable
+  // anterior). Se espera la fila resultante — estado observable, no un
+  // timeout arbitrario — antes de disparar el siguiente click.
   await page.getByRole('button', { name: /Agregar variable externa/ }).click();
   const trustedInsuranceVariable = page.locator('.form-group').filter({ hasText: 'variable1' }).first();
-  await trustedInsuranceVariable.locator('select').nth(1).selectOption('trusted');
+  await expect(trustedInsuranceVariable).toBeVisible();
+
+  await page.getByRole('button', { name: /Agregar variable externa/ }).click();
   const trustedVariable = page.locator('.form-group').filter({ hasText: 'variable2' }).first();
+  await expect(trustedVariable).toBeVisible();
+
+  await trustedInsuranceVariable.locator('select').nth(1).selectOption('trusted');
   await trustedVariable.locator('select').nth(1).selectOption('trusted');
 
   await nombre.getByLabel('Obligatoriedad condicional').check();
