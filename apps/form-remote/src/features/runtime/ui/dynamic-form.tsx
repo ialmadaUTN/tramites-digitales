@@ -133,7 +133,11 @@ export function DynamicForm(props: DynamicFormProps) {
         {runtime.definition.description && <p>{runtime.definition.description}</p>}
       </header>
       {runtime.definition.containers.map((container) => {
-        const containerEnabled = isElementEnabled(container.conditions, conditionValues, runtime.externalVariables);
+        // La habilitación se hereda del formulario igual que la inclusión: si el
+        // formulario está deshabilitado, el servidor no exige ningún campo
+        // —`validateSubmission` corta antes de recorrerlos—, así que el asterisco
+        // no puede prometer una validación que no va a ocurrir.
+        const containerEnabled = formEnabled && isElementEnabled(container.conditions, conditionValues, runtime.externalVariables);
         const containerIncluded = formIncluded && isElementIncluded(container.conditions, conditionValues, runtime.externalVariables);
         if (!isElementVisible(container.conditions, conditionValues, runtime.externalVariables)) return null;
         return (

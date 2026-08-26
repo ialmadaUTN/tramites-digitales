@@ -98,7 +98,7 @@ Un campo oculto, excluido o deshabilitado **no se exige**, aunque sea obligatori
 
 ### Un único criterio para las tres capas
 
-La obligatoriedad **declarada** (`isFieldRequired`) es solo una parte. La **efectiva** —la que decide si se exige un valor— se arma así, y las condiciones de los contenedores que envuelven al campo cuentan igual que las propias:
+La obligatoriedad **declarada** (`isFieldRequired`) es solo una parte. La **efectiva** —la que decide si se exige un valor— se arma así, y las condiciones de **todos** los ancestros cuentan igual que las propias: la sección que lo contiene y también el formulario completo. Si el formulario está deshabilitado, `validateSubmission` corta antes de recorrer los campos y no exige ninguno, así que el asterisco tampoco puede aparecer:
 
 ```
 visible ∧ incluido ∧ habilitado ∧ obligatorio
@@ -136,3 +136,4 @@ Los campos ocultos o excluidos no se validan ni viajan. Un campo deshabilitado n
 - **2026-08-21** — Se agregaron definiciones v3, variables externas tipadas, grupos anidados, inclusión independiente, condiciones jerárquicas y revalidación mediante contexto firmado en el BFF.
 - **2026-08-21** — Se fijó la compatibilidad entre obligatoriedad fija y lógica condicional. Declarar `rules.required` junto con `conditions.required` pasó a ser inválido: el contrato lo rechaza aunque se llame a la API directamente, y el editor deshabilita la opción que sobra. La obligatoriedad fija con visibilidad, inclusión o habilitación condicional queda definida como "obligatorio cuando está visible, incluido y habilitado".
 - **2026-08-22** — Revisión técnica. La exigencia de `defaultValue` en campos de solo lectura pasó a cubrir la obligatoriedad condicional además de la fija. Y cuando una definición ya trae las dos obligatoriedades, el editor deja de bloquear ambas para que se pueda desmarcar una y repararla.
+- **2026-08-26** — La habilitación del formulario completo se propaga a los contenedores, igual que la inclusión: antes solo se heredaba la del contenedor, así que un campo obligatorio mostraba el asterisco con el formulario deshabilitado, donde el servidor no exige nada.
