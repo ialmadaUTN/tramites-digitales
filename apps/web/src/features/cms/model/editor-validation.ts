@@ -1,4 +1,4 @@
-import type { FormContainer, FormDefinition, FormField } from '@tramites/form-contracts';
+import type { FaqBlock, FormContainer, FormDefinition, FormField } from '@tramites/form-contracts';
 import { duplicateOptionValues, isMaskCompatible, isValidRegexPattern, optionCatalogIncludes } from '@tramites/form-contracts/field-rules';
 import { fieldNameError } from '@tramites/form-contracts/field-name';
 import { validateFieldDefaultValue } from '@tramites/form-contracts/default-value-validation';
@@ -33,6 +33,11 @@ export type ContainerEditorErrors = {
   fields?: string;
 };
 
+export type FaqBlockEditorErrors = {
+  question?: string;
+  answer?: string;
+};
+
 export type DefinitionEditorErrors = {
   name?: string;
   title?: string;
@@ -42,6 +47,7 @@ export type DefinitionEditorErrors = {
   structure?: string;
   containers: Record<string, ContainerEditorErrors>;
   fields: Record<string, FieldEditorErrors>;
+  faqBlocks: Record<string, FaqBlockEditorErrors>;
   /**
    * Algo mal definido: bloquea guardar. Los problemas de completitud
    * estructural no cuentan acá, porque un borrador a medias se puede guardar.
@@ -193,6 +199,13 @@ function containerErrorsFor(container: FormContainer): ContainerEditorErrors {
   return errors;
 }
 
+function faqBlockErrorsFor(block: FaqBlock): FaqBlockEditorErrors {
+  const errors: FaqBlockEditorErrors = {};
+  if (!block.question.trim()) errors.question = 'La pregunta es obligatoria';
+  if (!block.answer.trim()) errors.answer = 'La respuesta es obligatoria';
+  return errors;
+}
+
 /**
  * Reproduce en el editor las reglas que el BFF aplica al guardar, para que el
  * autor vea el problema junto al campo en lugar de recibir un error genérico.
@@ -200,6 +213,7 @@ function containerErrorsFor(container: FormContainer): ContainerEditorErrors {
 export function collectDefinitionEditorErrors(definition: FormDefinition, name?: string): DefinitionEditorErrors {
   const containers: Record<string, ContainerEditorErrors> = {};
   const fields: Record<string, FieldEditorErrors> = {};
+  const faqBlocks: Record<string, FaqBlockEditorErrors> = {};
   /** Claves de payload de primer nivel: campos sueltos y grillas comparten espacio. */
   const rootNames = new Map<string, string>();
   const candidateIds = new Set(
@@ -267,10 +281,16 @@ export function collectDefinitionEditorErrors(definition: FormDefinition, name?:
     }
   }
 
+  for (const block of definition.faqBlocks ?? []) {
+    const errors = faqBlockErrorsFor(block);
+    if (Object.keys(errors).length > 0) faqBlocks[block.id] = errors;
+  }
+
   // Lo que bloquea **guardar**: algo mal definido. Se calcula antes de sumar los
   // problemas de completitud, que solo bloquean publicar.
   const hasErrors = Boolean(
-    nameError || titleError || submitLabelError || tipificationKeyError || Object.keys(containers).length || Object.keys(fields).length,
+    nameError || titleError || submitLabelError || tipificationKeyError
+      || Object.keys(containers).length || Object.keys(fields).length || Object.keys(faqBlocks).length,
   );
 
   // Completitud estructural, desde el contrato: mismo criterio y mismos mensajes
@@ -293,6 +313,7 @@ export function collectDefinitionEditorErrors(definition: FormDefinition, name?:
     structure,
     containers,
     fields,
+    faqBlocks,
     hasErrors,
     canPublish: !hasErrors && issues.length === 0,
   };

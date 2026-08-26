@@ -2,20 +2,24 @@ import { describe, expect, it } from 'vitest';
 import type { FormDefinition } from '@tramites/form-contracts';
 import {
   addContainer,
+  addFaqBlock,
   addField,
   addOption,
   changeFieldType,
   moveContainer,
+  moveFaqBlock,
   moveField,
   moveOption,
   parseDefaultValue,
   parseOptions,
   removeContainer,
+  removeFaqBlock,
   removeField,
   removeOption,
   serializeOptions,
   slugifyOptionValue,
   toggleFieldCondition,
+  updateFaqBlock,
   updateOption,
 } from './definition';
 
@@ -94,5 +98,30 @@ describe('definition mutations', () => {
     const enabled = toggleFieldCondition(definition.containers[0]!.fields[0]!, 'visible', true, 'f2');
     expect(enabled.conditions?.visible?.rules[0]?.fieldId).toBe('f2');
     expect(toggleFieldCondition(enabled, 'visible', false, 'f2').conditions).toBeUndefined();
+  });
+});
+
+describe('faq block mutations', () => {
+  it('adds a faq block with an empty answer and no faqBlocks array yet', () => {
+    const withFaq = addFaqBlock(definition);
+    expect(withFaq.faqBlocks).toHaveLength(1);
+    expect(withFaq.faqBlocks?.[0]).toMatchObject({ answer: '', initiallyOpen: false });
+    expect(definition.faqBlocks).toBeUndefined();
+  });
+
+  it('moves a faq block within bounds and no-ops out of bounds', () => {
+    const withTwo = addFaqBlock(addFaqBlock(definition));
+    const [first, second] = withTwo.faqBlocks!;
+    const moved = moveFaqBlock(withTwo, first!.id, 1);
+    expect(moved.faqBlocks?.map((block) => block.id)).toEqual([second!.id, first!.id]);
+    expect(moveFaqBlock(withTwo, first!.id, -1)).toBe(withTwo);
+  });
+
+  it('updates and removes a faq block by id', () => {
+    const withFaq = addFaqBlock(definition);
+    const blockId = withFaq.faqBlocks![0]!.id;
+    const updated = updateFaqBlock(withFaq, blockId, (block) => ({ ...block, question: '¿Cuándo?', answer: 'Mañana' }));
+    expect(updated.faqBlocks?.[0]).toMatchObject({ question: '¿Cuándo?', answer: 'Mañana' });
+    expect(removeFaqBlock(updated, blockId).faqBlocks).toEqual([]);
   });
 });

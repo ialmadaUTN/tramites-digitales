@@ -1,6 +1,7 @@
 import type { DynamicFormProps } from '@tramites/form-contracts';
 import { useRuntimeForm } from '../hooks/use-runtime-form';
 import { DynamicField } from './fields/dynamic-field';
+import { FaqAccordion } from './faq/faq-accordion';
 import { FormState } from './form-state';
 import { DynamicRepeater } from './repeater/dynamic-repeater';
 import '../../../styles.css';
@@ -34,13 +35,21 @@ export function DynamicForm(props: DynamicFormProps) {
         <h1>{runtime.definition.title}</h1>
         {runtime.definition.description && <p>{runtime.definition.description}</p>}
       </header>
+      {runtime.definition.faqBlocks && runtime.definition.faqBlocks.length > 0 && (
+        <section className="faq-section" aria-label="Preguntas frecuentes">
+          <h2>Preguntas frecuentes</h2>
+          {runtime.definition.faqBlocks.map((block) => (
+            <FaqAccordion key={block.id} block={block} />
+          ))}
+        </section>
+      )}
       {runtime.definition.containers.map((container) => (
         <section className="form-container" key={container.id}>
           <h2>{container.title}</h2>
           {container.kind === 'repeater' ? (
             <DynamicRepeater container={container} control={runtime.control} />
           ) : (
-            <div className={container.columns === 2 ? 'field-grid two-columns' : 'field-grid'}>
+            <div className={`field-grid columns-${container.columns}`}>
               {container.fields.map((field) => (
                 <DynamicField
                   key={field.id}

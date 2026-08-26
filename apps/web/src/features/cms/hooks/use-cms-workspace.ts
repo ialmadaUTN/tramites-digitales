@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormDefinition } from '@tramites/form-contracts';
 import { toErrorMessage } from '../../../shared/lib/http';
 import { formsApi, type FormsApi, type FormSummary } from '../api/forms-api';
@@ -38,6 +38,14 @@ export function useCmsWorkspace(api: FormsApi = formsApi) {
   const selected = useMemo(() => forms.find((form) => form.id === selectedId), [forms, selectedId]);
   const editorErrors = useMemo(() => collectDefinitionEditorErrors(definition, name), [definition, name]);
 
+  /**
+   * Cambios sin guardar por formulario. Cambiar de formulario en la lista no
+   * pierde lo que se estaba editando: se guarda acá y se restaura si se
+   * vuelve a seleccionar, hasta que se guarde el borrador (ahí se descarta,
+   * porque ya coincide con el servidor) o se recargue la página.
+   */
+  const unsavedDraftsRef = useRef(new Map<string, { name: string; definition: FormDefinition }>());
+
   const loadForms = useCallback(async () => {
     setForms(await api.list());
   }, [api]);
@@ -49,9 +57,18 @@ export function useCmsWorkspace(api: FormsApi = formsApi) {
   }, [loadForms]);
 
   async function selectForm(formId: string) {
+    if (selectedId) unsavedDraftsRef.current.set(selectedId, { name, definition });
     setSelectedId(formId);
     setPreview(false);
     setStatus(null);
+
+    const pending = unsavedDraftsRef.current.get(formId);
+    if (pending) {
+      setName(pending.name);
+      setDefinition(pending.definition);
+      return;
+    }
+
     const draft = await api.getDraft(formId);
     setName(draft.name);
     setDefinition(upgradeDefinitionToV2(draft.definition));
@@ -83,6 +100,7 @@ export function useCmsWorkspace(api: FormsApi = formsApi) {
     setStatus(null);
     try {
       await api.saveDraft(selectedId, name, definition);
+      unsavedDraftsRef.current.delete(selectedId);
       await loadForms();
       setStatus({ text: 'Borrador guardado' });
       return true;

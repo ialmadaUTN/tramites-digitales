@@ -165,12 +165,30 @@ export const formFieldSchema = z.object({
 });
 export type FormField = z.infer<typeof formFieldSchema>;
 
+/**
+ * Bloque informativo tipo FAQ: pregunta/respuesta mostrada como acordeón en el
+ * runtime. Vive a nivel de formulario, no de contenedor, y no participa de la
+ * validación de campos ni del payload de la submission (ver `flattenFields` /
+ * `cleanSubmissionPayload`, que no lo recorren).
+ *
+ * El contenido es texto plano a propósito: admitir Markdown/HTML requeriría
+ * sanitizar antes de renderizar, y hoy no hay una necesidad concreta que lo
+ * justifique. Si aparece, este es el único lugar que hay que tocar.
+ */
+export const faqBlockSchema = z.object({
+  id: z.string().min(1),
+  question: z.string().min(1),
+  answer: z.string().min(1),
+  initiallyOpen: z.boolean().default(false),
+});
+export type FaqBlock = z.infer<typeof faqBlockSchema>;
+
 export const formContainerSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
   kind: z.enum(['section', 'repeater']).optional(),
   fieldName: fieldNameSchema.optional(),
-  columns: z.union([z.literal(1), z.literal(2)]).default(1),
+  columns: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]).default(1),
   minRows: z.number().int().nonnegative().optional(),
   maxRows: z.number().int().positive().max(50).optional(),
   fields: z.array(formFieldSchema),
@@ -185,6 +203,7 @@ export const formDefinitionSchema = z
     description: z.string().optional(),
     submitLabel: z.string().min(1).max(80).default('Enviar'),
     containers: z.array(formContainerSchema),
+    faqBlocks: z.array(faqBlockSchema).optional(),
   })
   .superRefine((definition, ctx) => {
     const isV2 = definition.schemaVersion === 2;

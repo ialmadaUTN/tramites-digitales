@@ -1,4 +1,4 @@
-import type { ConditionGroup, ConditionRule, FieldType, FormContainer, FormDefinition, FormField, FormOption } from '@tramites/form-contracts';
+import type { ConditionGroup, ConditionRule, FaqBlock, FieldType, FormContainer, FormDefinition, FormField, FormOption } from '@tramites/form-contracts';
 import { defaultValuesOutsideCatalog, isMaskCompatible } from '@tramites/form-contracts/field-rules';
 import {
   LENGTH_RULE_FIELD_TYPES,
@@ -95,6 +95,33 @@ export function removeField(definition: FormDefinition, fieldId: string): FormDe
       ...container,
       fields: container.fields.filter((field) => field.id !== fieldId),
     })),
+  };
+}
+
+export function createFaqBlock(index: number): FaqBlock {
+  return { id: createId('faq'), question: `Pregunta ${index}`, answer: '', initiallyOpen: false };
+}
+
+export function addFaqBlock(definition: FormDefinition): FormDefinition {
+  const faqBlocks = definition.faqBlocks ?? [];
+  return { ...definition, faqBlocks: [...faqBlocks, createFaqBlock(faqBlocks.length + 1)] };
+}
+
+export function removeFaqBlock(definition: FormDefinition, blockId: string): FormDefinition {
+  return { ...definition, faqBlocks: (definition.faqBlocks ?? []).filter((block) => block.id !== blockId) };
+}
+
+export function moveFaqBlock(definition: FormDefinition, blockId: string, offset: -1 | 1): FormDefinition {
+  const faqBlocks = definition.faqBlocks ?? [];
+  const index = faqBlocks.findIndex((block) => block.id === blockId);
+  const moved = moveItem(faqBlocks, index, offset);
+  return moved ? { ...definition, faqBlocks: moved } : definition;
+}
+
+export function updateFaqBlock(definition: FormDefinition, blockId: string, update: (block: FaqBlock) => FaqBlock): FormDefinition {
+  return {
+    ...definition,
+    faqBlocks: (definition.faqBlocks ?? []).map((block) => (block.id === blockId ? update(block) : block)),
   };
 }
 
