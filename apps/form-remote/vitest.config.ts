@@ -8,6 +8,8 @@ export default defineConfig({
     coverage: coverage(
       // Piso = lo ya alcanzado (ratchet): impide retroceder sin fingir una
       // meta. `use-runtime-form` ya tiene tests (carga, pausa y error de
+      // envío); lo que sigue abierto es `dynamic-field` + `dynamic-repeater`.
+      { statements: 48, branches: 31, functions: 48, lines: 50 },
       // envío); lo que sigue abierto es `dynamic-repeater`.
       { statements: 64, branches: 56, functions: 60, lines: 66 },
       [

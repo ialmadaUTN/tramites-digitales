@@ -51,8 +51,8 @@ export function WorkspaceHeader({
   };
 
   return (
-    <div className="card">
-      <div className="toolbar">
+    <>
+      <div className="workspace-actions-bar">
         <div className="toolbar-info">
           <h2>{title}</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
@@ -151,84 +151,86 @@ export function WorkspaceHeader({
         </div>
       </div>
 
-      {status && (
-        <div className={`status ${status.error ? 'error' : ''}`}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            {status.error ? (
-              <>
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </>
-            ) : (
-              <>
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                <polyline points="22 4 12 14.01 9 11.01" />
-              </>
-            )}
-          </svg>
-          {status.text}
-        </div>
-      )}
+      <div className="card">
+        {status && (
+          <div className={`status ${status.error ? 'error' : ''}`}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              {status.error ? (
+                <>
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </>
+              ) : (
+                <>
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
+                </>
+              )}
+            </svg>
+            {status.text}
+          </div>
+        )}
 
-      <div className="form-grid" style={{ marginTop: 20 }}>
-        <div className="form-group">
-          <label>Nombre interno (gestión)</label>
-          <input
-            value={name}
-            className={editorErrors.name ? 'invalid' : undefined}
-            aria-invalid={Boolean(editorErrors.name)}
-            onChange={(event) => onNameChange(event.target.value)}
-            placeholder="Ej. Solicitud de Licencia"
-          />
-          {editorErrors.name && <span className="field-error">{editorErrors.name}</span>}
-        </div>
-        <div className="form-group">
-          <label>Título visible al usuario</label>
-          <input
-            value={definition.title}
-            className={editorErrors.title ? 'invalid' : undefined}
-            aria-invalid={Boolean(editorErrors.title)}
-            onChange={(event) => onDefinitionChange({ ...definition, title: event.target.value })}
-            placeholder="Ej. Formulario de Solicitud"
-          />
-          {editorErrors.title && <span className="field-error">{editorErrors.title}</span>}
-        </div>
-        <div className="form-group full">
-          <label>Descripción pública</label>
-          <textarea
-            value={definition.description ?? ''}
-            onChange={(event) => onDefinitionChange({ ...definition, description: event.target.value })}
-            placeholder="Ingresá una breve explicación para el solicitante..."
-          />
-        </div>
-        <div className="form-group">
-          <label>Etiqueta del botón de envío</label>
-          <input
-            value={definition.submitLabel}
-            className={editorErrors.submitLabel ? 'invalid' : undefined}
-            aria-invalid={Boolean(editorErrors.submitLabel)}
-            onChange={(event) => onDefinitionChange({ ...definition, submitLabel: event.target.value })}
-            placeholder="Enviar solicitud"
-          />
-          {editorErrors.submitLabel && <span className="field-error">{editorErrors.submitLabel}</span>}
-        </div>
-        <div className="form-group">
-          <label>Clave de tipificación</label>
-          <input
-            value={definition.tipificationKey ?? ''}
-            className={editorErrors.tipificationKey ? 'invalid' : undefined}
-            aria-invalid={Boolean(editorErrors.tipificationKey)}
-            onChange={(event) => onDefinitionChange({ ...definition, schemaVersion: 2, tipificationKey: event.target.value })}
-            placeholder="Ej. generic"
-          />
-          {editorErrors.tipificationKey ? (
-            <span className="field-error">{editorErrors.tipificationKey}</span>
-          ) : (
-            <span className="hint">Debe coincidir con un mapper registrado en el BFF.</span>
-          )}
+        <div className="form-grid" style={status ? { marginTop: 20 } : undefined}>
+          <div className="form-group">
+            <label>Nombre interno (gestión)</label>
+            <input
+              value={name}
+              className={editorErrors.name ? 'invalid' : undefined}
+              aria-invalid={Boolean(editorErrors.name)}
+              onChange={(event) => onNameChange(event.target.value)}
+              placeholder="Ej. Solicitud de Licencia"
+            />
+            {editorErrors.name && <span className="field-error">{editorErrors.name}</span>}
+          </div>
+          <div className="form-group">
+            <label>Título visible al usuario</label>
+            <input
+              value={definition.title}
+              className={editorErrors.title ? 'invalid' : undefined}
+              aria-invalid={Boolean(editorErrors.title)}
+              onChange={(event) => onDefinitionChange({ ...definition, title: event.target.value })}
+              placeholder="Ej. Formulario de Solicitud"
+            />
+            {editorErrors.title && <span className="field-error">{editorErrors.title}</span>}
+          </div>
+          <div className="form-group full">
+            <label>Descripción pública</label>
+            <textarea
+              value={definition.description ?? ''}
+              onChange={(event) => onDefinitionChange({ ...definition, description: event.target.value })}
+              placeholder="Ingresá una breve explicación para el solicitante..."
+            />
+          </div>
+          <div className="form-group">
+            <label>Etiqueta del botón de envío</label>
+            <input
+              value={definition.submitLabel}
+              className={editorErrors.submitLabel ? 'invalid' : undefined}
+              aria-invalid={Boolean(editorErrors.submitLabel)}
+              onChange={(event) => onDefinitionChange({ ...definition, submitLabel: event.target.value })}
+              placeholder="Enviar solicitud"
+            />
+            {editorErrors.submitLabel && <span className="field-error">{editorErrors.submitLabel}</span>}
+          </div>
+          <div className="form-group">
+            <label>Clave de tipificación</label>
+            <input
+              value={definition.tipificationKey ?? ''}
+              className={editorErrors.tipificationKey ? 'invalid' : undefined}
+              aria-invalid={Boolean(editorErrors.tipificationKey)}
+              onChange={(event) => onDefinitionChange({ ...definition, schemaVersion: 2, tipificationKey: event.target.value })}
+              placeholder="Ej. generic"
+            />
+            {editorErrors.tipificationKey ? (
+              <span className="field-error">{editorErrors.tipificationKey}</span>
+            ) : (
+              <span className="hint">Debe coincidir con un mapper registrado en el BFF.</span>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

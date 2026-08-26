@@ -29,6 +29,29 @@ Una definición tiene **contenedores**, y cada contenedor tiene campos o ítems 
 
 Cada campo aporta una clave al payload final mediante su `fieldName`, que debe ser un identificador simple (empieza con letra o `_`, solo letras, números y `_`) y único dentro de su ámbito.
 
+### Distribución en columnas
+
+Cada contenedor (sección o grilla) elige entre **1, 2, 3 o 4 columnas** (`container.columns`). El runtime (`apps/form-remote`) las renderiza como una grilla CSS con esa cantidad de columnas iguales, vía la clase `columns-N` en `apps/form-remote/src/features/runtime/ui/dynamic-form.tsx`. La Vista Previa del CMS usa el mismo componente y el mismo CSS (`apps/form-remote/src/styles.css`) — no hay una implementación de grilla separada para el editor.
+
+**Span de cada campo**, según su `width`:
+
+| `width` | `grid-column` | Efecto |
+| --- | --- | --- |
+| `full` (default) | `1 / -1` | Ocupa toda la fila, sin importar cuántas columnas tenga el contenedor. |
+| `half` | `span 1` | Ocupa una de las N columnas del contenedor. Con 2 columnas es literalmente la mitad; con 3 o 4 es un tercio o un cuarto — "respeta la distribución disponible" en vez de forzar un 50% fijo. |
+
+Cuando hay más campos que columnas, el navegador los acomoda solo en la fila siguiente (comportamiento nativo de CSS Grid con `grid-auto-flow` por defecto): no hace falta lógica adicional para el wrap.
+
+**Breakpoints y ancho mínimo.** Cada columna necesita ~200px para que sus controles no se vean apretados; con el gap de 18px entre columnas eso da un umbral de ~854px para 4 columnas y ~618px para 3. Por eso:
+
+| Ancho de pantalla | 3 o 4 columnas configuradas | 2 columnas configuradas | 1 columna configurada |
+| --- | --- | --- | --- |
+| > 900px | Se muestran tal cual (3 o 4) | 2 | 1 |
+| ≤ 900px | Se reducen a 2 | 2 | 1 |
+| ≤ 640px | 1 (todo apilado) | 1 | 1 |
+
+Las columnas usan `minmax(0, 1fr)` en vez de un mínimo fijo en píxeles: eso deja que la columna se achique junto con la pantalla en lugar de desbordar y generar scroll horizontal. El breakpoint de 640px es el mismo que ya colapsa el resto de `.dynamic-form` (padding, tamaño de título) a su versión mobile.
+
 ### Versiones de esquema
 
 - **v1**: formato original, sigue soportado para lo ya publicado.
@@ -144,7 +167,7 @@ Las reglas viven en `packages/form-contracts/src/structural-validation.ts` y el 
 
 **Por qué son dos esquemas y no una regla más en el base:** `formDefinitionSchema` también valida las **lecturas** — `list()` lo corre por cada formulario. Si rechazara definiciones incompletas, un único borrador vacío ya guardado dejaría al CMS sin listado y sin forma de entrar a arreglarlo.
 
-**Contenedores solo informativos:** hoy todos los tipos de campo son de entrada, así que "tener contenido" es "tener al menos un campo". Cuando existan componentes informativos (FAQ, textos de ayuda), un contenedor que solo los tenga **se considera válido**; la decisión ya está tomada y el único lugar a tocar es `hasContent` en `structural-validation.ts`.
+**Contenedores solo informativos:** hoy todos los tipos de campo son de entrada, así que "tener contenido" es "tener al menos un campo". Si en el futuro aparecen componentes informativos **dentro de un contenedor**, uno que solo los tenga se considerará válido; el único lugar a tocar sería `hasContent` en `structural-validation.ts`. Los bloques FAQ ya implementados no entran en este caso: viven a nivel de formulario, no de contenedor — ver [Bloques informativos FAQ](bloques-informativos-faq.md).
 | Condiciones incompletas o mal apuntadas | Ver [Lógica condicional](logica-condicional.md) |
 | Obligatoriedad fija y condicional a la vez | Un campo obligatorio no puede tener además obligatoriedad condicional: dejá solo una de las dos |
 | Variables externas, plantillas o bloques incompatibles | La variable no está declarada, el placeholder es inválido, el tipo no coincide o el bloque se usa dentro de una grilla |
@@ -169,6 +192,7 @@ El BFF revalida todo contra el contrato al guardar: el editor adelanta el diagn�
 | Validación previa al guardado | `apps/web/src/features/cms/model/editor-validation.ts` |
 | Completitud estructural | `packages/form-contracts/src/structural-validation.ts` |
 | Editor de campo | `apps/web/src/features/cms/ui/field-editor.tsx` |
+| Distribución en columnas y su CSS responsive | `apps/form-remote/src/features/runtime/ui/dynamic-form.tsx`, `apps/form-remote/src/styles.css` |
 | Tablas de reglas (tests) | `packages/form-contracts/src/rules.test.ts` |
 
 ## Historial de cambios
@@ -177,6 +201,10 @@ El BFF revalida todo contra el contrato al guardar: el editor adelanta el diagn�
 - **2026-08-20** — Se agregaron campos de solo lectura, reglas de longitud en todos los tipos de texto, mensajes de error de formato y de tipo, obligatoriedad configurable en columnas de grilla, editor de condiciones con reglas múltiples y todos los operadores, validación de catálogos y de valores por defecto, y validación previa al guardado para regex, duplicados, rangos, máscaras y parámetros no enteros.
 - **2026-08-20** — Se retiró del CMS la acción para crear nuevas grillas repetibles; las grillas existentes siguen siendo editables.
 - **2026-08-20** — El ciclo de autoría suma la pausa: un formulario publicado se puede sacar de circulación y reactivar desde el encabezado del workspace, y el listado lo rotula como "Pausado". Detalle en [pausa de formularios](pausa-de-formularios.md).
+- **2026-08-20** — Se agregó la validación de completitud estructural (formulario sin contenedores, contenedor sin campos, grilla sin columnas) como un nivel aparte del esquema base: bloquea publicar pero no guardar, porque un borrador es trabajo a medias. `collectDefinitionEditorErrors` devuelve ahora `canPublish` además de `hasErrors`, y el BFF valida `publish()` contra `publishableFormDefinitionSchema`. Se definió que un contenedor con solo componentes informativos será válido cuando esos componentes existan.
+- **2026-08-24** — Se agregaron bloques informativos FAQ a nivel de formulario (no de contenedor): CRUD y reordenamiento desde el CMS, acordeones accesibles en el runtime, sin participar de la validación de campos ni del payload. Detalle en [Bloques informativos FAQ](bloques-informativos-faq.md).
+- **2026-08-25** — Cambiar de formulario en la lista sin haber guardado ya no descarta lo que se estaba editando: `useCmsWorkspace` guarda en memoria el nombre y la definición de cada formulario que se deja a medio editar, y los restaura si se vuelve a seleccionar. Se descarta recién cuando se guarda el borrador (ahí ya coincide con el servidor) o al recargar la página.
+- **2026-08-25** — La distribución en columnas de un contenedor pasó de admitir 1 o 2 a admitir 1, 2, 3 o 4. Se agregaron breakpoints intermedios (900px baja 3-4 columnas a 2; 640px las baja todas a 1) para que ninguna columna quede más angosta que el mínimo cómodo (~200px) ni aparezca scroll horizontal. El span de cada campo (`full`/`half`) no cambió: `full` sigue ocupando toda la fila y `half` sigue ocupando una de las N columnas, sea cual sea N.
 - **2026-08-20** — Se agregó la validación de completitud estructural (formulario sin contenedores, contenedor sin campos, grilla sin columnas) como un nivel aparte del esquema base: bloquea publicar pero no guardar, porque un borrador es trabajo a medias. `collectDefinitionEditorErrors` devuelve ahora `canPublish` además de `hasErrors`, y el BFF valida `publish()` contra `publishableFormDefinitionSchema`.
 - **2026-08-21** — Se agregó la autoría v3 de variables externas, condiciones jerárquicas, exclusión independiente y bloques informativos ordenados; los formularios v1/v2 se migran a v3 al abrirse en el CMS sin alterar la versión publicada.
 - **2026-08-21** — La vista previa del CMS incorporó un panel de contexto tipado para probar variables externas y mostrar el estado efectivo y el payload limpio sin enviar esos valores al servidor.

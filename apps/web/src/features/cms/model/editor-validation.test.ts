@@ -297,3 +297,37 @@ describe('completitud estructural', () => {
     expect(errors.canPublish).toBe(false);
   });
 });
+
+describe('bloques FAQ', () => {
+  it('no bloquea nada cuando no hay bloques FAQ', () => {
+    const errors = collectDefinitionEditorErrors(definition, 'Demo');
+    expect(errors.faqBlocks).toEqual({});
+  });
+
+  it('exige pregunta y respuesta, y bloquea guardar (no es completitud estructural)', () => {
+    const withEmptyFaq: FormDefinition = {
+      ...definition,
+      faqBlocks: [{ id: 'faq-1', question: '', answer: '', initiallyOpen: false }],
+    };
+    const errors = collectDefinitionEditorErrors(withEmptyFaq, 'Demo');
+    expect(errors.faqBlocks['faq-1']).toEqual({ question: 'La pregunta es obligatoria', answer: 'La respuesta es obligatoria' });
+    expect(errors.hasErrors).toBe(true);
+  });
+
+  it('acepta un bloque FAQ completo', () => {
+    const validDefinition: FormDefinition = {
+      title: 'Demo',
+      submitLabel: 'Enviar',
+      containers: [{
+        id: 'c1',
+        title: 'Uno',
+        columns: 1,
+        fields: [{ id: 'f1', fieldName: 'nombre', type: 'text', label: 'Nombre', width: 'full', rules: {} }],
+      }],
+      faqBlocks: [{ id: 'faq-1', question: '¿Qué necesito?', answer: 'El DNI.', initiallyOpen: false }],
+    };
+    const errors = collectDefinitionEditorErrors(validDefinition, 'Demo');
+    expect(errors.faqBlocks['faq-1']).toBeUndefined();
+    expect(errors.hasErrors).toBe(false);
+  });
+});

@@ -1,9 +1,12 @@
 'use client';
 
+import type { FormDefinition } from '@tramites/form-contracts';
+import { addContainer, addFaqBlock, addField, moveContainer, removeContainer, updateContainer } from '../model/definition';
 import type { ConditionGroup, FormDefinition } from '@tramites/form-contracts';
 import { containerFields } from '@tramites/form-contracts/field-rules';
 import { addContainer, addExternalVariable, addField, addTextBlock, moveContainer, moveContainerItem, removeContainer, removeExternalVariable, removeTextBlock, setContainerCondition, setFormCondition, updateContainer, updateExternalVariable, updateTextBlock } from '../model/definition';
 import type { DefinitionEditorErrors } from '../model/editor-validation';
+import { FaqBlockEditor } from './faq-block-editor';
 import { FieldEditor } from './field-editor';
 import { ConditionEditor } from './condition-editor';
 
@@ -197,11 +200,13 @@ export function DefinitionEditor({ definition, editorErrors, setDefinition }: De
               <select
                 value={container.columns}
                 onChange={(event) =>
-                  setDefinition(updateContainer(definition, container.id, (current) => ({ ...current, columns: Number(event.target.value) as 1 | 2 })))
+                  setDefinition(updateContainer(definition, container.id, (current) => ({ ...current, columns: Number(event.target.value) as 1 | 2 | 3 | 4 })))
                 }
               >
                 <option value={1}>1 columna (Vista completa)</option>
-                <option value={2}>2 columnas (Vista dividida)</option>
+                <option value={2}>2 columnas</option>
+                <option value={3}>3 columnas</option>
+                <option value={4}>4 columnas</option>
               </select>
             </div>
           </div>
@@ -276,6 +281,46 @@ export function DefinitionEditor({ definition, editorErrors, setDefinition }: De
             + Agregar primer contenedor
           </button>
         </div>
+      )}
+
+      <div className="toolbar" style={{ marginTop: 28, paddingTop: 20, borderTop: '1px dashed var(--line)' }}>
+        <div>
+          <h2>Preguntas Frecuentes (FAQ)</h2>
+          <span className="hint">
+            Bloques informativos mostrados como acordeones en el formulario. No participan de la validación de campos ni del envío.
+          </span>
+        </div>
+        <div className="toolbar-actions">
+          <button
+            type="button"
+            className="button secondary"
+            onClick={() => setDefinition(addFaqBlock(definition))}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Agregar Bloque FAQ
+          </button>
+        </div>
+      </div>
+
+      <div className="faq-blocks-list">
+        {(definition.faqBlocks ?? []).map((block, blockIndex) => (
+          <FaqBlockEditor
+            key={block.id}
+            block={block}
+            index={blockIndex}
+            count={definition.faqBlocks?.length ?? 0}
+            definition={definition}
+            blockErrors={editorErrors.faqBlocks[block.id]}
+            setDefinition={setDefinition}
+          />
+        ))}
+      </div>
+
+      {(definition.faqBlocks ?? []).length === 0 && (
+        <p className="hint" style={{ marginTop: 8 }}>Todavía no agregaste bloques FAQ.</p>
       )}
     </div>
   );

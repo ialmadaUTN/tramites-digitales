@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { FormDefinition } from '@tramites/form-contracts';
 import {
   addContainer,
+  addFaqBlock,
   addExternalVariable,
   externalVariableCandidates,
   addField,
@@ -10,12 +11,14 @@ import {
   addOption,
   changeFieldType,
   moveContainer,
+  moveFaqBlock,
   moveField,
   moveContainerItem,
   moveOption,
   parseDefaultValue,
   parseOptions,
   removeContainer,
+  removeFaqBlock,
   removeField,
   removeExternalVariable,
   removeTextBlock,
@@ -23,6 +26,7 @@ import {
   serializeOptions,
   slugifyOptionValue,
   toggleFieldCondition,
+  updateFaqBlock,
   setContainerCondition,
   setFormCondition,
   setConditionLogic,
@@ -189,5 +193,30 @@ describe('definition mutations', () => {
     expect(setFieldRule(setFieldRule(field, 'required', true), 'required', false).rules.required).toBeUndefined();
     expect(setFieldErrorMessage(field, 'required', 'Obligatorio').rules.errorMessages?.required).toBe('Obligatorio');
     expect(setFieldErrorMessage(setFieldErrorMessage(field, 'required', 'Obligatorio'), 'required', ' ').rules.errorMessages).toBeUndefined();
+  });
+});
+
+describe('faq block mutations', () => {
+  it('adds a faq block with an empty answer and no faqBlocks array yet', () => {
+    const withFaq = addFaqBlock(definition);
+    expect(withFaq.faqBlocks).toHaveLength(1);
+    expect(withFaq.faqBlocks?.[0]).toMatchObject({ answer: '', initiallyOpen: false });
+    expect(definition.faqBlocks).toBeUndefined();
+  });
+
+  it('moves a faq block within bounds and no-ops out of bounds', () => {
+    const withTwo = addFaqBlock(addFaqBlock(definition));
+    const [first, second] = withTwo.faqBlocks!;
+    const moved = moveFaqBlock(withTwo, first!.id, 1);
+    expect(moved.faqBlocks?.map((block) => block.id)).toEqual([second!.id, first!.id]);
+    expect(moveFaqBlock(withTwo, first!.id, -1)).toBe(withTwo);
+  });
+
+  it('updates and removes a faq block by id', () => {
+    const withFaq = addFaqBlock(definition);
+    const blockId = withFaq.faqBlocks![0]!.id;
+    const updated = updateFaqBlock(withFaq, blockId, (block) => ({ ...block, question: '¿Cuándo?', answer: 'Mañana' }));
+    expect(updated.faqBlocks?.[0]).toMatchObject({ question: '¿Cuándo?', answer: 'Mañana' });
+    expect(removeFaqBlock(updated, blockId).faqBlocks).toEqual([]);
   });
 });
