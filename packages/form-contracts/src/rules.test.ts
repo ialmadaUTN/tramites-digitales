@@ -81,6 +81,7 @@ describe('rechazo de definiciones inválidas', () => {
     ['fieldName que no es identificador', { type: 'text', fieldName: '1abc' }, /identificador simple/],
     ['condición que se referencia a sí misma', { type: 'text', conditions: { visible: { logic: 'all', rules: [{ fieldId: 'f1', operator: 'notEmpty' }] } } }, /se referencia a sí misma/],
     ['condición a un campo inexistente', { type: 'text', conditions: { visible: { logic: 'all', rules: [{ fieldId: 'fantasma', operator: 'notEmpty' }] } } }, /Campo referido inexistente/],
+    ['obligatoriedad fija y condicional a la vez', { type: 'text', rules: { required: true }, conditions: { required: { logic: 'all', rules: [{ fieldId: 'fantasma', operator: 'notEmpty' }] } } }, /no puede tener además obligatoriedad condicional/],
   ];
 
   it.each(cases)('rechaza %s', (_name, target, expected) => {
@@ -227,6 +228,103 @@ describe('valores por defecto configurados en el CMS', () => {
   it('respeta los mensajes de error personalizados', () => {
     expect(validateFieldDefaultValue(field({ type: 'email', defaultValue: 'x', rules: { errorMessages: { pattern: 'Mail mal escrito' } } })))
       .toBe('Mail mal escrito');
+  });
+});
+
+/**
+ * Compatibilidad entre obligatoriedad fija y lógica condicional.
+ *
+ * La fila de la tabla de arriba cubre el rechazo; acá se verifica sobre una
+ * definición de dos campos, donde la condición apunta a un campo real y el
+ * conflicto es el **único** problema.
+ */
+describe('obligatoriedad fija frente a las condiciones', () => {
+  const gate = { id: 'gate', fieldName: 'gate', type: 'text', label: 'Gate', width: 'full', rules: {} };
+  const pointsAtGate = { logic: 'all', rules: [{ fieldId: 'gate', operator: 'notEmpty' }] };
+
+  function twoFields(target: Record<string, unknown>) {
+    return {
+      schemaVersion: 2,
+      tipificationKey: 'generic@v1',
+      title: 'Reglas',
+      submitLabel: 'Enviar',
+      containers: [{
+        id: 'c1',
+        title: 'Uno',
+        kind: 'section',
+        columns: 1,
+        fields: [gate, { id: 'f1', fieldName: 'campo', type: 'text', label: 'Campo', width: 'full', rules: {}, ...target }],
+      }],
+    };
+  }
+
+  it('rechaza obligatorio fijo con obligatoriedad condicional, y es el único error', () => {
+    const errors = definitionErrors(twoFields({ rules: { required: true }, conditions: { required: pointsAtGate } }));
+    expect(errors).toBe('Un campo obligatorio no puede tener además obligatoriedad condicional: dejá solo una de las dos');
+  });
+
+  const permitidas: [string, Record<string, unknown>][] = [
+    // La fija convive con visibilidad y habilitación: significa "obligatorio
+    // cuando está visible y habilitado", que es una configuración legítima.
+    ['fija + visibilidad condicional', { rules: { required: true }, conditions: { visible: pointsAtGate } }],
+    ['fija + habilitación condicional', { rules: { required: true }, conditions: { enabled: pointsAtGate } }],
+    ['fija + visibilidad + habilitación', { rules: { required: true }, conditions: { visible: pointsAtGate, enabled: pointsAtGate } }],
+    ['condicional sola', { conditions: { required: pointsAtGate } }],
+    ['condicional + visibilidad', { conditions: { required: pointsAtGate, visible: pointsAtGate } }],
+    ['sin obligatoriedad', {}],
+  ];
+
+  it.each(permitidas)('acepta %s', (_name, target) => {
+    expect(definitionErrors(twoFields(target))).toBe('');
+  });
+});
+
+/**
+ * Solo lectura frente a la obligatoriedad condicional.
+ *
+ * El campo no se puede completar, así que si llega a exigirse sin `defaultValue`
+ * el formulario queda imposible de enviar. La regla mira **cualquier** vía de
+ * obligatoriedad, no solo la fija: con la condicional el problema aparece recién
+ * en runtime, cuando la condición se cumple.
+ */
+describe('solo lectura y obligatoriedad condicional', () => {
+  const gate = { id: 'gate', fieldName: 'gate', type: 'text', label: 'Gate', width: 'full', rules: {} };
+  const pointsAtGate = { logic: 'all', rules: [{ fieldId: 'gate', operator: 'notEmpty' }] };
+
+  function twoFields(target: Record<string, unknown>) {
+    return {
+      schemaVersion: 2,
+      tipificationKey: 'generic@v1',
+      title: 'Reglas',
+      submitLabel: 'Enviar',
+      containers: [{
+        id: 'c1',
+        title: 'Uno',
+        kind: 'section',
+        columns: 1,
+        fields: [gate, { id: 'f1', fieldName: 'campo', type: 'text', label: 'Campo', width: 'full', rules: {}, ...target }],
+      }],
+    };
+  }
+
+  const cases: [string, Record<string, unknown>, RegExp | undefined][] = [
+    // El caso que se colaba: obligatoriedad condicional sobre un campo de solo
+    // lectura sin valor por defecto.
+    ['condicional sin default', { readOnly: true, conditions: { required: pointsAtGate } }, /necesita un valor por defecto/],
+    ['fija sin default', { readOnly: true, rules: { required: true } }, /necesita un valor por defecto/],
+    ['condicional con default', { readOnly: true, defaultValue: 'fijo', conditions: { required: pointsAtGate } }, undefined],
+    ['fija con default', { readOnly: true, defaultValue: 'fijo', rules: { required: true } }, undefined],
+    // Sin obligatoriedad de ningún tipo, el default no hace falta.
+    ['solo lectura sin obligatoriedad', { readOnly: true }, undefined],
+    // Y sin solo lectura, la condicional sin default es perfectamente válida:
+    // el usuario puede completarlo.
+    ['condicional sin solo lectura', { conditions: { required: pointsAtGate } }, undefined],
+  ];
+
+  it.each(cases)('%s', (_name, target, expected) => {
+    const errors = definitionErrors(twoFields(target));
+    if (expected === undefined) expect(errors).toBe('');
+    else expect(errors).toMatch(expected);
   });
 });
 

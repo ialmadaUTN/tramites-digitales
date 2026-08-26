@@ -2,6 +2,7 @@
 
 import type { AllowedMimeType, FieldType, FormDefinition, FormField, MaskKind } from '@tramites/form-contracts';
 import { isMaskCompatible } from '@tramites/form-contracts/field-rules';
+import { REQUIRED_CONFLICT_MESSAGE } from '@tramites/form-contracts/required-semantics';
 import {
   changeFieldType,
   moveField,
@@ -150,6 +151,18 @@ export function FieldEditor({ field, index, definition, containerId: _containerI
   const acceptsLengthRules = LENGTH_RULE_FIELD_TYPES.includes(field.type);
   const acceptsMask = MASK_FIELD_TYPES.includes(field.type);
   const acceptsReadOnly = !READ_ONLY_BLOCKED_FIELD_TYPES.includes(field.type);
+  const fixedRequired = Boolean(field.rules.required);
+  const conditionalRequired = Boolean(field.conditions?.required);
+  /**
+   * Cada opción se deshabilita solo si la **otra** está activa y ella no.
+   *
+   * Si se deshabilitaran ambas cuando las dos están marcadas, una definición
+   * guardada antes de esta regla quedaría irreparable: el editor bloquea guardar
+   * por el conflicto y no deja desmarcar ninguna de las dos para resolverlo.
+   */
+  const requiredConflict = fixedRequired && conditionalRequired;
+  const lockFixedRequired = conditionalRequired && !requiredConflict;
+  const lockConditionalRequired = fixedRequired && !requiredConflict;
 
   return (
     <div className={`field-editor${fieldErrors ? ' has-error' : ''}`}>
@@ -533,10 +546,14 @@ export function FieldEditor({ field, index, definition, containerId: _containerI
 
       {/* Switches & Condicionales */}
       <div className="checkbox-row">
-        <label>
+        {/* Obligatoriedad fija y condicional son excluyentes: tenerlas juntas es
+            ambiguo y la fija gana en silencio. Se deshabilita la que sobra en vez
+            de dejar configurar algo que el contrato después rechaza. */}
+        <label title={lockFixedRequired || requiredConflict ? REQUIRED_CONFLICT_MESSAGE : undefined}>
           <input
             type="checkbox"
             checked={Boolean(field.rules.required)}
+            disabled={lockFixedRequired}
             onChange={(event) => change((current) => setFieldRule(current, 'required', event.target.checked))}
           />
           Obligatorio
@@ -577,10 +594,11 @@ export function FieldEditor({ field, index, definition, containerId: _containerI
               />
               Inclusión condicional
             </label>
-            <label>
+            <label title={lockConditionalRequired || requiredConflict ? REQUIRED_CONFLICT_MESSAGE : undefined}>
               <input
                 type="checkbox"
                 checked={Boolean(field.conditions?.required)}
+                disabled={lockConditionalRequired}
                 onChange={(event) => toggleCondition('required', event.target.checked)}
               />
               Obligatoriedad condicional
@@ -589,6 +607,13 @@ export function FieldEditor({ field, index, definition, containerId: _containerI
         )}
       </div>
       {fieldErrors?.readOnly && <span className="field-error">{fieldErrors.readOnly}</span>}
+      {!repeater && (fixedRequired || conditionalRequired) && (
+        <span className="hint">
+          {fixedRequired
+            ? 'Obligatorio siempre que el campo esté visible y habilitado. Si se oculta o se deshabilita por una condición, no se exige y no se envía.'
+            : 'Obligatorio solo cuando se cumple la condición, y siempre que el campo esté visible y habilitado.'}
+        </span>
+      )}
       {repeater && (
         <span className="hint">Las celdas de una grilla no admiten lógica condicional.</span>
       )}

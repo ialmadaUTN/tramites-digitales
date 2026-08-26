@@ -133,14 +133,14 @@ Cuidado con las carreras de hidratación: el CMS es un client component, y un cl
 
 | Paquete | Cobertura | Tests |
 | --- | --- | --- |
-| `packages/form-contracts` | 94,41 % | 142 |
-| `apps/web` | 66,51 % | 122 |
+| `packages/form-contracts` | 94,63 % | 167 |
+| `apps/web` | 66,61 % | 131 |
 | `apps/bff` | 75,51 % | 4 |
-| `apps/form-remote` | 26,54 % | 39 |
+| `apps/form-remote` | 31,41 % | 46 |
 
 Lo que falta, en orden de valor:
 
-1. **`apps/form-remote`**: `use-runtime-form.ts`, `dynamic-field.tsx` y `dynamic-repeater.tsx` no tienen tests. Ahí vive la lógica de visibilidad, habilitación y filas de grilla en runtime. Es el hueco más grande.
+1. **`apps/form-remote`**: `use-runtime-form.ts` y `dynamic-repeater.tsx` no tienen tests. Ahí vive la lógica de carga y de filas de grilla en runtime. Es el hueco más grande. De `dynamic-field.tsx` ya está cubierta la marca de obligatorio y el descarte de campos ocultos.
 2. **`apps/web`**: `hooks/use-cms-workspace.ts` está en 0 %. Decide cuándo se puede guardar y publicar. No se excluyó justamente para que siga a la vista.
 3. **`apps/bff`**: los servicios de submissions y uploads están excluidos por ser orquestación de I/O. Si les entra lógica de negocio, salen de la exclusión y se testean.
 

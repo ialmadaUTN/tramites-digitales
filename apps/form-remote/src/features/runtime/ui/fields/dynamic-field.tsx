@@ -20,6 +20,10 @@ export function DynamicField({ field, control, values, errors, fieldMap, externa
   const byId = valuesByFieldId(fieldMap, values);
   if (!isFieldVisible(field, byId, externalVariables)) return null;
   const enabled = ancestorEnabled && isFieldEnabled(field, byId, externalVariables);
+  // Obligatoriedad **efectiva**, no declarada: un campo deshabilitado o excluido
+  // no lo exige el servidor, así que marcarlo con el asterisco sería prometer una
+  // validación que no va a ocurrir. Es el mismo criterio que arma
+  // `validateSubmission`, y por eso la marca coincide siempre con lo exigido.
   const required = enabled && ancestorIncluded && isFieldIncluded(field, byId, externalVariables) && isFieldRequired(field, byId, externalVariables);
   const error = errors[field.fieldName]?.message;
   const options = field.options ?? [];

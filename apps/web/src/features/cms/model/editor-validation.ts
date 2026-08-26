@@ -2,6 +2,7 @@ import type { ConditionGroup, ConditionRule, ExternalVariable, FormContainer, Fo
 import { containerFields } from '@tramites/form-contracts/field-rules';
 import { duplicateOptionValues, isMaskCompatible, isValidRegexPattern, optionCatalogIncludes } from '@tramites/form-contracts/field-rules';
 import { fieldNameError } from '@tramites/form-contracts/field-name';
+import { canBecomeRequired, hasRequiredConflict, REQUIRED_CONFLICT_MESSAGE } from '@tramites/form-contracts/required-semantics';
 import { validateFieldDefaultValue } from '@tramites/form-contracts/default-value-validation';
 import { structuralIssues } from '@tramites/form-contracts/structural-validation';
 import {
@@ -149,7 +150,10 @@ function ruleErrors(field: FormField): Pick<FieldEditorErrors, 'pattern' | 'leng
 function readOnlyError(field: FormField): string | undefined {
   if (!field.readOnly) return undefined;
   if (READ_ONLY_BLOCKED_FIELD_TYPES.includes(field.type)) return 'Este tipo de campo no admite solo lectura';
-  if (field.rules.required && field.defaultValue === undefined) {
+  // Cualquier obligatoriedad que pueda aplicarse, fija o condicional: al ser de
+  // solo lectura nadie puede completar el campo, así que sin default el
+  // formulario queda imposible de enviar cuando la condición se cumple.
+  if (canBecomeRequired(field) && field.defaultValue === undefined) {
     return 'Un campo obligatorio de solo lectura necesita un valor por defecto';
   }
   return undefined;
@@ -183,6 +187,9 @@ function conditionErrors(field: FormField, insideRepeater: boolean, candidateIds
   const groups = Object.entries(field.conditions ?? {}).filter(([, group]) => group);
   if (groups.length === 0) return undefined;
   if (insideRepeater) return 'Las celdas de una grilla no admiten condiciones';
+  // Cubre las definiciones que ya venían con las dos activas: el editor ahora
+  // impide llegar a este estado, pero un borrador viejo puede tenerlo.
+  if (hasRequiredConflict(field)) return REQUIRED_CONFLICT_MESSAGE;
   for (const [, group] of groups) {
     if (!group || conditionLeaves(group).length === 0) return 'Cada condición necesita al menos una regla';
     for (const rule of conditionLeaves(group)) {

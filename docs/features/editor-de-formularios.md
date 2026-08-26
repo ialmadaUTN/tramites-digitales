@@ -100,7 +100,7 @@ Al cambiar el tipo de un campo, el valor por defecto se conserva **solo si sigue
 
 Por campo se puede configurar:
 
-- **Obligatoriedad** (también en cada columna de una grilla).
+- **Obligatoriedad** (también en cada columna de una grilla). Es fija o condicional, nunca las dos: ver [Lógica condicional](logica-condicional.md#compatibilidad-con-la-obligatoriedad-fija).
 - **Longitud** mínima y máxima, en los tipos de texto.
 - **Rango numérico** mínimo y máximo, en `number`.
 - **Expresión regular**.
@@ -146,6 +146,7 @@ Las reglas viven en `packages/form-contracts/src/structural-validation.ts` y el 
 
 **Contenedores solo informativos:** hoy todos los tipos de campo son de entrada, así que "tener contenido" es "tener al menos un campo". Cuando existan componentes informativos (FAQ, textos de ayuda), un contenedor que solo los tenga **se considera válido**; la decisión ya está tomada y el único lugar a tocar es `hasContent` en `structural-validation.ts`.
 | Condiciones incompletas o mal apuntadas | Ver [Lógica condicional](logica-condicional.md) |
+| Obligatoriedad fija y condicional a la vez | Un campo obligatorio no puede tener además obligatoriedad condicional: dejá solo una de las dos |
 | Variables externas, plantillas o bloques incompatibles | La variable no está declarada, el placeholder es inválido, el tipo no coincide o el bloque se usa dentro de una grilla |
 | Grilla sin columnas o con filas inconsistentes | Ver [Grillas repetibles](grillas-repetibles.md) |
 

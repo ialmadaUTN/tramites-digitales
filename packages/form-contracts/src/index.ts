@@ -2,6 +2,8 @@ import { z } from 'zod';
 export type { Database, Json } from './database.types.js';
 export { FIELD_NAME_INVALID_MESSAGE, FIELD_NAME_PATTERN, fieldNameError } from './field-name.js';
 import { FIELD_NAME_INVALID_MESSAGE, FIELD_NAME_PATTERN } from './field-name.js';
+export { REQUIRED_CONFLICT_MESSAGE, canBecomeRequired, hasRequiredConflict } from './required-semantics.js';
+import { canBecomeRequired, hasRequiredConflict, REQUIRED_CONFLICT_MESSAGE } from './required-semantics.js';
 export {
   EMPTY_CONTAINER_MESSAGE,
   EMPTY_FORM_MESSAGE,
@@ -388,6 +390,9 @@ export const formDefinitionSchema = z
         if (Array.isArray(field.defaultValue) && !MULTI_VALUE_FIELD_TYPES.includes(field.type)) {
           ctx.addIssue({ code: 'custom', path: [...fieldPath, 'defaultValue'], message: `${field.type} no admite un valor por defecto múltiple` });
         }
+        if (hasRequiredConflict(field)) {
+          ctx.addIssue({ code: 'custom', path: [...fieldPath, 'conditions', 'required'], message: REQUIRED_CONFLICT_MESSAGE });
+        }
         if (field.rules.pattern !== undefined && !isValidRegexPattern(field.rules.pattern)) {
           ctx.addIssue({ code: 'custom', path: [...fieldPath, 'rules', 'pattern'], message: 'La expresión regular no es válida' });
         }
@@ -406,7 +411,10 @@ export const formDefinitionSchema = z
         if (field.readOnly && READ_ONLY_UNSUPPORTED_FIELD_TYPES.includes(field.type)) {
           ctx.addIssue({ code: 'custom', path: [...fieldPath, 'readOnly'], message: `${field.type} no admite solo lectura` });
         }
-        if (field.readOnly && field.rules.required && field.defaultValue === undefined) {
+        // `canBecomeRequired` y no `rules.required`: con obligatoriedad condicional
+        // el campo se exige cuando la condición se cumple, y al ser de solo lectura
+        // nadie puede completarlo. Sin default, el formulario queda imposible de enviar.
+        if (field.readOnly && canBecomeRequired(field) && field.defaultValue === undefined) {
           ctx.addIssue({ code: 'custom', path: [...fieldPath, 'defaultValue'], message: 'Un campo obligatorio de solo lectura necesita un valor por defecto' });
         }
         if (field.readOnly && !isV2) {
@@ -752,6 +760,16 @@ export function isFieldIncluded(field: FormField, values: Record<string, unknown
   return evaluateCondition(field.conditions?.included, values, external);
 }
 
+/**
+ * Obligatoriedad **declarada**: fija o condicional. El contrato garantiza que no
+ * pueden estar las dos (ver `required-semantics.ts`), así que el `||` no arrastra
+ * ninguna ambigüedad: solo una de las dos ramas puede estar configurada.
+ *
+ * Esto no dice si el campo se exige *ahora*. Ese criterio necesita además la
+ * visibilidad, la inclusión y la habilitación —propias y de los contenedores que
+ * lo envuelven— y lo arman `validateSubmission` y `DynamicField`, que son los
+ * únicos que tienen ese contexto.
+ */
 export function isFieldRequired(field: FormField, values: Record<string, unknown>, external: ExternalVariableValues = {}): boolean {
   return Boolean(field.rules.required) || Boolean(field.conditions?.required && evaluateCondition(field.conditions.required, values, external));
 }
