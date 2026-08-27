@@ -437,6 +437,26 @@ button, input, textarea, select {
   transition: border-color 0.2s ease;
 }
 
+/* Barra de acciones del formulario (Guardar/Publicar/Pausar): fija arriba al
+   scrollear, para que no haya que volver al inicio de la página para
+   guardar mientras se edita algo lejos del encabezado (ej. bloques FAQ). */
+.workspace-actions-bar {
+  position: sticky;
+  top: 82px;
+  z-index: 40;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px;
+  margin-bottom: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--card-bg);
+  box-shadow: var(--shadow-md);
+}
+
 /* Toolbar */
 .toolbar {
   display: flex;
@@ -1457,7 +1477,8 @@ button, input, textarea, select {
     width: 100%;
   }
 
-  .toolbar {
+  .toolbar,
+  .workspace-actions-bar {
     flex-direction: column;
     align-items: flex-start;
   }

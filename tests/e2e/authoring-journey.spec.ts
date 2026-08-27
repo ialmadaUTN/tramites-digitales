@@ -19,7 +19,20 @@ function formGroup(page: Page, labelText: string | RegExp) {
 
 /** El editor del campo N-ésimo del primer contenedor. */
 function fieldEditor(page: Page, index: number) {
-  return page.locator('.field-editor').nth(index);
+  return page.locator('.container-editor').first().locator('.field-editor').nth(index);
+}
+
+/**
+ * El editor del bloque informativo agregado al primer contenedor.
+ *
+ * `.field-editor` es la clase que comparten tres editores distintos (campo,
+ * bloque informativo del contenedor y bloque FAQ del formulario), así que un
+ * índice posicional es frágil: alcanza con que se agregue un bloque FAQ antes
+ * en el recorrido para que deje de apuntar al bloque correcto. Se identifica
+ * por su rótulo en cambio, que es estable sin importar el orden.
+ */
+function textBlockEditor(page: Page) {
+  return page.locator('.container-editor').first().locator('.field-editor').filter({ hasText: 'Bloque informativo' });
 }
 
 let createdFormId: string | undefined;
@@ -61,11 +74,21 @@ test('un formulario creado en el CMS se publica y se completa en el host', async
   await nombre.locator('.form-group').filter({ hasText: 'Etiqueta visible (Label)' }).locator('input').fill('Nombre completo');
 
   // --- Contexto externo y bloque informativo ------------------------------
-  await page.getByRole('button', { name: /Agregar variable externa/ }).click();
+  // Cada click re-renderiza todo el editor y la fila nueva se inserta arriba
+  // del botón, corriéndolo de posición. Si el segundo click sale antes de que
+  // React confirme el primer estado, Playwright compite contra un layout
+  // todavía en movimiento (o un handler que todavía no ve la variable
+  // anterior). Se espera la fila resultante — estado observable, no un
+  // timeout arbitrario — antes de disparar el siguiente click.
   await page.getByRole('button', { name: /Agregar variable externa/ }).click();
   const trustedInsuranceVariable = page.locator('.form-group').filter({ hasText: 'variable1' }).first();
-  await trustedInsuranceVariable.locator('select').nth(1).selectOption('trusted');
+  await expect(trustedInsuranceVariable).toBeVisible();
+
+  await page.getByRole('button', { name: /Agregar variable externa/ }).click();
   const trustedVariable = page.locator('.form-group').filter({ hasText: 'variable2' }).first();
+  await expect(trustedVariable).toBeVisible();
+
+  await trustedInsuranceVariable.locator('select').nth(1).selectOption('trusted');
   await trustedVariable.locator('select').nth(1).selectOption('trusted');
 
   await nombre.getByLabel('Obligatoriedad condicional').check();
@@ -74,7 +97,7 @@ test('un formulario creado en el CMS se publica y se completa en el host', async
   await requiredCondition.locator('.condition-rule').locator('input').fill('2050');
 
   await page.getByRole('button', { name: /Agregar bloque informativo/ }).first().click();
-  const contextualBlock = fieldEditor(page, 1);
+  const contextualBlock = textBlockEditor(page);
   await contextualBlock.locator('.form-group').filter({ hasText: 'Título' }).locator('input').fill('Información contextual');
   await contextualBlock.locator('.form-group').filter({ hasText: 'Contenido' }).locator('textarea').fill('Cliente: {{variable2}}');
   await contextualBlock.getByLabel('Visibilidad condicional').check();

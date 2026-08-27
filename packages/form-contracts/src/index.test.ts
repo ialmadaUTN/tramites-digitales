@@ -339,3 +339,82 @@ describe('form contracts', () => {
     expect(() => validateDefinition(field({ type: 'alphabetic', maskKind: 'dni_ar' }))).toThrow(/no es compatible/);
   });
 });
+
+describe('faqBlocks', () => {
+  it('accepts a definition without faqBlocks (undefined, not required)', () => {
+    expect(definition.faqBlocks).toBeUndefined();
+  });
+
+  it('parses faqBlocks and keeps them out of the submission payload', () => {
+    const withFaq = validateDefinition({
+      title: 'Demo',
+      submitLabel: 'Enviar',
+      containers: [{ id: 'one', title: 'Uno', columns: 1, fields: [
+        { id: 'name', fieldName: 'name', type: 'text', label: 'Nombre', rules: {} },
+      ] }],
+      faqBlocks: [{ id: 'faq-1', question: '¿Qué necesito?', answer: 'El DNI.', initiallyOpen: true }],
+    });
+    expect(withFaq.faqBlocks).toEqual([{ id: 'faq-1', question: '¿Qué necesito?', answer: 'El DNI.', initiallyOpen: true }]);
+    expect(cleanSubmissionPayload(withFaq, { name: 'Ana' })).toEqual({ name: 'Ana' });
+  });
+
+  it('rejects a faqBlock with an empty question or answer', () => {
+    const base = { title: 'Demo', submitLabel: 'Enviar', containers: [] };
+    expect(() => validateDefinition({ ...base, faqBlocks: [{ id: 'faq-1', question: '', answer: 'Respuesta', initiallyOpen: false }] })).toThrow();
+    expect(() => validateDefinition({ ...base, faqBlocks: [{ id: 'faq-1', question: 'Pregunta', answer: '', initiallyOpen: false }] })).toThrow();
+  });
+
+  it('rejects a faqBlock whose question or answer is only whitespace, same as the editor', () => {
+    // El editor ya rechazaba esto con `.trim()`; el contrato no lo hacía, así
+    // que una llamada directa al BFF podía guardar lo que el editor bloqueaba.
+    const base = { title: 'Demo', submitLabel: 'Enviar', containers: [] };
+    expect(() => validateDefinition({ ...base, faqBlocks: [{ id: 'faq-1', question: '   ', answer: 'Respuesta', initiallyOpen: false }] })).toThrow(/pregunta es obligatoria/);
+    expect(() => validateDefinition({ ...base, faqBlocks: [{ id: 'faq-1', question: 'Pregunta', answer: '\t\n ', initiallyOpen: false }] })).toThrow(/respuesta es obligatoria/);
+  });
+
+  it('defaults initiallyOpen to false when omitted', () => {
+    const withFaq = validateDefinition({
+      title: 'Demo',
+      submitLabel: 'Enviar',
+      containers: [],
+      faqBlocks: [{ id: 'faq-1', question: 'Pregunta', answer: 'Respuesta' }],
+    });
+    expect(withFaq.faqBlocks?.[0]?.initiallyOpen).toBe(false);
+  });
+
+  it('carries faqBlocks through unchanged when upgrading a v1 draft to v2', () => {
+    const v1 = validateDefinition({
+      title: 'Demo',
+      submitLabel: 'Enviar',
+      containers: [],
+      faqBlocks: [{ id: 'faq-1', question: 'Pregunta', answer: 'Respuesta', initiallyOpen: false }],
+    });
+    expect(upgradeDefinitionToV2(v1).faqBlocks).toEqual(v1.faqBlocks);
+  });
+});
+
+describe('container.columns', () => {
+  const withColumns = (columns: unknown) => ({
+    title: 'Demo',
+    submitLabel: 'Enviar',
+    containers: [{ id: 'one', title: 'Uno', columns, fields: [] }],
+  });
+
+  it.each([1, 2, 3, 4])('acepta %i columnas', (columns) => {
+    expect(validateDefinition(withColumns(columns)).containers[0]?.columns).toBe(columns);
+  });
+
+  it('rechaza una cantidad de columnas fuera de 1-4', () => {
+    expect(() => validateDefinition(withColumns(5))).toThrow();
+    expect(() => validateDefinition(withColumns(0))).toThrow();
+  });
+
+  it('por defecto es 1 columna si no se especifica', () => {
+    const definition = validateDefinition({
+      title: 'Demo',
+      submitLabel: 'Enviar',
+      containers: [{ id: 'one', title: 'Uno', fields: [] }],
+    });
+    expect(definition.containers[0]?.columns).toBe(1);
+  });
+});

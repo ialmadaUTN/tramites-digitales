@@ -2,6 +2,7 @@ import { isElementEnabled, isElementIncluded, isElementVisible, resolveTextTempl
 import { useEffect, useMemo, useRef } from 'react';
 import { useRuntimeForm } from '../hooks/use-runtime-form';
 import { DynamicField } from './fields/dynamic-field';
+import { FaqAccordion } from './faq/faq-accordion';
 import { FormState } from './form-state';
 import { DynamicRepeater } from './repeater/dynamic-repeater';
 import '../../../styles.css';
@@ -132,6 +133,14 @@ export function DynamicForm(props: DynamicFormProps) {
         <h1>{runtime.definition.title}</h1>
         {runtime.definition.description && <p>{runtime.definition.description}</p>}
       </header>
+      {runtime.definition.faqBlocks && runtime.definition.faqBlocks.length > 0 && (
+        <section className="faq-section" aria-label="Preguntas frecuentes">
+          <h2>Preguntas frecuentes</h2>
+          {runtime.definition.faqBlocks.map((block) => (
+            <FaqAccordion key={block.id} block={block} />
+          ))}
+        </section>
+      )}
       {runtime.definition.containers.map((container) => {
         // La habilitación se hereda del formulario igual que la inclusión: si el
         // formulario está deshabilitado, el servidor no exige ningún campo
@@ -147,7 +156,7 @@ export function DynamicForm(props: DynamicFormProps) {
               <DynamicRepeater container={container} control={runtime.control} enabled={containerEnabled} />
             ) : (
               <fieldset disabled={!containerEnabled} style={{ border: 0, padding: 0, margin: 0 }}>
-                <div className={container.columns === 2 ? 'field-grid two-columns' : 'field-grid'}>
+                <div className={`field-grid columns-${container.columns}`}>
                   {(container.items ?? container.fields.map((field) => ({ kind: 'field' as const, field }))).map((item) => renderItem(item, containerEnabled, containerIncluded))}
                 </div>
               </fieldset>
