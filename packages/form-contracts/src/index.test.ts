@@ -364,6 +364,14 @@ describe('faqBlocks', () => {
     expect(() => validateDefinition({ ...base, faqBlocks: [{ id: 'faq-1', question: 'Pregunta', answer: '', initiallyOpen: false }] })).toThrow();
   });
 
+  it('rejects a faqBlock whose question or answer is only whitespace, same as the editor', () => {
+    // El editor ya rechazaba esto con `.trim()`; el contrato no lo hacía, así
+    // que una llamada directa al BFF podía guardar lo que el editor bloqueaba.
+    const base = { title: 'Demo', submitLabel: 'Enviar', containers: [] };
+    expect(() => validateDefinition({ ...base, faqBlocks: [{ id: 'faq-1', question: '   ', answer: 'Respuesta', initiallyOpen: false }] })).toThrow(/pregunta es obligatoria/);
+    expect(() => validateDefinition({ ...base, faqBlocks: [{ id: 'faq-1', question: 'Pregunta', answer: '\t\n ', initiallyOpen: false }] })).toThrow(/respuesta es obligatoria/);
+  });
+
   it('defaults initiallyOpen to false when omitted', () => {
     const withFaq = validateDefinition({
       title: 'Demo',

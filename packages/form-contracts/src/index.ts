@@ -261,8 +261,8 @@ export type FormField = z.infer<typeof formFieldSchema>;
  */
 export const faqBlockSchema = z.object({
   id: z.string().min(1),
-  question: z.string().min(1),
-  answer: z.string().min(1),
+  question: z.string().min(1).refine((value) => value.trim().length > 0, 'La pregunta es obligatoria'),
+  answer: z.string().min(1).refine((value) => value.trim().length > 0, 'La respuesta es obligatoria'),
   initiallyOpen: z.boolean().default(false),
 });
 export type FaqBlock = z.infer<typeof faqBlockSchema>;
