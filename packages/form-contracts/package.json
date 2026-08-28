@@ -4,14 +4,70 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./default-value-validation": "./src/default-value-validation.ts",
-    "./field-name": "./src/field-name.ts",
-    "./field-rules": "./src/field-rules.ts",
-    "./migrations": "./src/migrations.ts",
-    "./required-semantics": "./src/required-semantics.ts",
-    "./structural-validation": "./src/structural-validation.ts",
-    "./validation": "./src/validation.ts"
+    ".": {
+      "types": "./src/index.ts",
+      "development": "./src/index.ts",
+      "node": "./dist/index.js",
+      "import": "./src/index.ts",
+      "require": "./dist/index.js",
+      "default": "./src/index.ts"
+    },
+    "./default-value-validation": {
+      "types": "./src/default-value-validation.ts",
+      "development": "./src/default-value-validation.ts",
+      "node": "./dist/default-value-validation.js",
+      "import": "./src/default-value-validation.ts",
+      "require": "./dist/default-value-validation.js",
+      "default": "./src/default-value-validation.ts"
+    },
+    "./field-name": {
+      "types": "./src/field-name.ts",
+      "development": "./src/field-name.ts",
+      "node": "./dist/field-name.js",
+      "import": "./src/field-name.ts",
+      "require": "./dist/field-name.js",
+      "default": "./src/field-name.ts"
+    },
+    "./field-rules": {
+      "types": "./src/field-rules.ts",
+      "development": "./src/field-rules.ts",
+      "node": "./dist/field-rules.js",
+      "import": "./src/field-rules.ts",
+      "require": "./dist/field-rules.js",
+      "default": "./src/field-rules.ts"
+    },
+    "./migrations": {
+      "types": "./src/migrations.ts",
+      "development": "./src/migrations.ts",
+      "node": "./dist/migrations.js",
+      "import": "./src/migrations.ts",
+      "require": "./dist/migrations.js",
+      "default": "./src/migrations.ts"
+    },
+    "./required-semantics": {
+      "types": "./src/required-semantics.ts",
+      "development": "./src/required-semantics.ts",
+      "node": "./dist/required-semantics.js",
+      "import": "./src/required-semantics.ts",
+      "require": "./dist/required-semantics.js",
+      "default": "./src/required-semantics.ts"
+    },
+    "./structural-validation": {
+      "types": "./src/structural-validation.ts",
+      "development": "./src/structural-validation.ts",
+      "node": "./dist/structural-validation.js",
+      "import": "./src/structural-validation.ts",
+      "require": "./dist/structural-validation.js",
+      "default": "./src/structural-validation.ts"
+    },
+    "./validation": {
+      "types": "./src/validation.ts",
+      "development": "./src/validation.ts",
+      "node": "./dist/validation.js",
+      "import": "./src/validation.ts",
+      "require": "./dist/validation.js",
+      "default": "./src/validation.ts"
+    }
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

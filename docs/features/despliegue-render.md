@@ -46,16 +46,18 @@ Las URLs públicas se conocen después de crear los servicios. Por eso se cargan
 
 ## Dónde mirar
 
-| Qué                                | Dónde                                      |
-| ---------------------------------- | ------------------------------------------ |
-| Blueprint                          | `render.yaml`                              |
-| Puerto y host del BFF              | `apps/bff/src/main.ts`                     |
-| Health check del BFF               | `apps/bff/src/health.controller.ts`        |
-| Puerto y host del mock             | `apps/dynamics-mock/src/config/env.ts`     |
-| CORS del renderer                  | `apps/form-remote/vite.config.ts`          |
-| URL pública del BFF y del renderer | `apps/web/src/shared/config/public-env.ts` |
-| Cliente que entrega a Dynamics     | `apps/bff/src/dynamics.client.ts`          |
+| Qué                                       | Dónde                                      |
+| ----------------------------------------- | ------------------------------------------ |
+| Blueprint                                 | `render.yaml`                              |
+| Puerto y host del BFF                     | `apps/bff/src/main.ts`                     |
+| Health check del BFF                      | `apps/bff/src/health.controller.ts`        |
+| Puerto y host del mock                    | `apps/dynamics-mock/src/config/env.ts`     |
+| Exportaciones de contrato para producción | `packages/form-contracts/package.json`     |
+| CORS del renderer                         | `apps/form-remote/vite.config.ts`          |
+| URL pública del BFF y del renderer        | `apps/web/src/shared/config/public-env.ts` |
+| Cliente que entrega a Dynamics            | `apps/bff/src/dynamics.client.ts`          |
 
 ## Historial de cambios
 
 - **2026-08-28** — Se agregó el Blueprint inicial de Render con servicios separados para Next.js, NestJS, Module Federation y el mock de Dynamics; se adaptaron los procesos HTTP a `PORT`/`0.0.0.0`, se agregó el health check del BFF y se documentaron las variables, CORS y restricciones del despliegue.
+- **2026-08-28** — Las exportaciones de `@tramites/form-contracts` usan `dist` bajo Node en producción y conservan `src` para desarrollo y bundlers, evitando que el BFF y el mock intenten cargar archivos `.js` inexistentes junto a los fuentes TypeScript.
