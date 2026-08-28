@@ -21,7 +21,7 @@ Flujo de autoría: crear → editar → **Guardar** (borrador) → **Publicar** 
 
 Una vez publicado, el formulario se puede sacar de circulación sin despublicarlo: ver [pausa de formularios](pausa-de-formularios.md). Publicar una versión nueva no reactiva un formulario pausado, y la vista previa del borrador sigue funcionando aunque lo esté.
 
-Los recorridos E2E que crean formularios (`tests/e2e/authoring-journey.spec.ts` y `tests/e2e/form-flow.spec.ts`) usan formularios reales para verificar el CMS y la cadena CMS → BFF → Supabase → host. Cada `afterEach` registra el ID desde el momento de la creación y elimina sus submissions, los uploads cuando el schema REST los expone y el formulario al terminar, incluso si una aserción posterior falla; las versiones publicadas se eliminan por cascade de la base.
+Los recorridos E2E que crean formularios (`tests/e2e/authoring-journey.spec.ts`, `tests/e2e/form-flow.spec.ts`, `tests/e2e/faq-journey.spec.ts` y `tests/e2e/json-preview-journey.spec.ts`) usan formularios reales para verificar el CMS y la cadena CMS → BFF → Supabase → host. Cada `afterEach` registra el ID desde el momento de la creación y elimina sus submissions, los uploads cuando el schema REST los expone y el formulario al terminar, incluso si una aserción posterior falla; las versiones publicadas se eliminan por cascade de la base.
 
 ### Estructura
 
@@ -175,6 +175,16 @@ Las reglas viven en `packages/form-contracts/src/structural-validation.ts` y el 
 
 El BFF revalida todo contra el contrato al guardar: el editor adelanta el diagnóstico, no lo reemplaza.
 
+## Vista JSON
+
+Junto a "Estructura" y "Vista Previa", el workspace tiene una tercera pestaña **"JSON"** (`apps/web/src/features/cms/ui/json-preview-panel.tsx`) con una vista de solo lectura de la definición tal como se normalizaría y guardaría en el BFF.
+
+- **Normalización real, no un espejo del formulario en pantalla.** El panel corre `formDefinitionSchema.safeParse(definition)` — el mismo esquema que valida el BFF — y muestra `parsed.data`. Por eso trae aplicados los valores por defecto (`columns`, `width`, `rules: {}`, etc.) aunque no se hayan tocado en el editor, y nunca puede filtrar una clave que el contrato no declare (ver [restricciones conocidas](#restricciones-conocidas) para el resto de lo que el editor no expone).
+- **Formateado e indentado**, y se **actualiza en vivo**: es un componente controlado por la misma `definition` que edita "Estructura", así que cualquier cambio de campos, reglas, condiciones o contenedores se ve reflejado en el próximo render.
+- **Copiar** copia el JSON completo al portapapeles (`navigator.clipboard.writeText`) y confirma con un badge "¡Copiado!" durante 2 segundos.
+- **Errores de validación**, en un cartel arriba del JSON (`role="alert"`), reutilizando los mismos mensajes que ya ve el autor en "Estructura" (`collectDefinitionEditorErrors`) más `editorErrors.structure` — la completitud estructural (p. ej. un formulario sin contenedores) también se avisa acá, porque `formDefinitionSchema` acepta `containers: []` y sin este aviso el panel se quedaría mudo justo cuando Publicar está bloqueado por esa razón. Si el schema falla por algo que el editor no marcó (caso raro: ver por ejemplo el título de más de 200 caracteres, que el editor no chequea por longitud), el panel recurre como último recurso a los issues crudos de Zod para no quedarse en silencio. Con el schema roto, igual se muestra el mejor esfuerzo posible del JSON (`definition` sin normalizar) en vez de dejar el panel en blanco.
+- **Solo lectura a propósito**, en esta primera versión: es un `<pre>`, no hay ningún control para editar el JSON desde acá.
+
 ## Restricciones conocidas
 
 - Los `<label>` del editor no están asociados a sus controles (`htmlFor`), así que los tests consultan por grupo. Es deuda de accesibilidad pendiente.
@@ -193,10 +203,12 @@ El BFF revalida todo contra el contrato al guardar: el editor adelanta el diagn�
 | Completitud estructural | `packages/form-contracts/src/structural-validation.ts` |
 | Editor de campo | `apps/web/src/features/cms/ui/field-editor.tsx` |
 | Distribución en columnas y su CSS responsive | `apps/form-remote/src/features/runtime/ui/dynamic-form.tsx`, `apps/form-remote/src/styles.css` |
+| Vista JSON de solo lectura | `apps/web/src/features/cms/ui/json-preview-panel.tsx` |
 | Tablas de reglas (tests) | `packages/form-contracts/src/rules.test.ts` |
 
 ## Historial de cambios
 
+- **2026-08-28** — Se agregó al workspace una pestaña "JSON" de solo lectura con la definición normalizada (mismo `formDefinitionSchema` que el BFF), que se actualiza en vivo, permite copiar el contenido e informa los errores de validación con los mismos mensajes que "Estructura" — incluida la completitud estructural, que el esquema base por sí solo no rechaza. Detalle en [Vista JSON](#vista-json).
 - **2026-08-21** — El E2E de autoría limpia el formulario creado y sus dependencias al finalizar para no acumular datos de prueba publicados.
 - **2026-08-20** — Se agregaron campos de solo lectura, reglas de longitud en todos los tipos de texto, mensajes de error de formato y de tipo, obligatoriedad configurable en columnas de grilla, editor de condiciones con reglas múltiples y todos los operadores, validación de catálogos y de valores por defecto, y validación previa al guardado para regex, duplicados, rangos, máscaras y parámetros no enteros.
 - **2026-08-20** — Se retiró del CMS la acción para crear nuevas grillas repetibles; las grillas existentes siguen siendo editables.

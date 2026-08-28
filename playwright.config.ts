@@ -8,6 +8,17 @@ const contextEnv = {
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
+  // Todos los specs comparten un único set de servidores de dev y la misma
+  // base de Supabase (no hay entornos aislados por worker). En local, con
+  // varios cores libres, correr en paralelo no compite lo suficiente para
+  // notarse. Los runners de CI tienen bastante menos CPU: ahí, dos specs que
+  // levantan el CMS a la vez (p. ej. `authoring-journey` y otro que también
+  // compila/edita formularios) terminan compitiendo por el mismo compilador
+  // de Next en modo dev, empujando el más pesado de los recorridos —
+  // `authoring-journey`, el que más pasos y round-trips de red tiene — fuera
+  // de sus timeouts. Correrlos en serie en CI elimina esa contención sin
+  // tocar ninguna espera ni timeout de los tests.
+  workers: process.env.CI ? 1 : undefined,
   reporter: 'list',
   use: { baseURL: 'http://localhost:3000', trace: 'on-first-retry', ...devices['Desktop Chrome'] },
   webServer: [

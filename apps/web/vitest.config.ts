@@ -14,12 +14,12 @@ export default defineConfig({
         'src/features/cms/model/**': { statements: 92, branches: 85, functions: 98, lines: 95 },
         // UI del editor: se cubre con tests de interacción sobre la definición
         // que produce, no línea por línea. El piso es lo ya alcanzado.
-        'src/features/cms/ui/**': { statements: 61, branches: 72, functions: 55, lines: 66 },
+        'src/features/cms/ui/**': { statements: 62, branches: 72, functions: 55, lines: 68 },
         // Piso global. `hooks/use-cms-workspace.ts` ya está cubierto: decide
         // cuándo se puede guardar, publicar y pausar, y qué aviso ve el autor.
         statements: 81,
         branches: 79,
-        functions: 70,
+        functions: 71,
         lines: 85,
       },
       [

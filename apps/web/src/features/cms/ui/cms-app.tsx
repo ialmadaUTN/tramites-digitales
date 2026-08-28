@@ -8,6 +8,7 @@ import { useCmsWorkspace } from '../hooks/use-cms-workspace';
 import { CmsShell } from './cms-shell';
 import { DefinitionEditor } from './definition-editor';
 import { FormList } from './form-list';
+import { JsonPreviewPanel } from './json-preview-panel';
 import { PreviewContextPanel } from './preview-context-panel';
 import { WorkspaceHeader } from './workspace-header';
 
@@ -70,18 +71,18 @@ export function CmsApp() {
                 editorErrors={workspace.editorErrors}
                 status={workspace.status}
                 saving={workspace.saving}
-                preview={workspace.preview}
+                view={workspace.view}
                 published={workspace.selected?.published ?? false}
                 paused={workspace.selected?.paused ?? false}
                 onNameChange={workspace.setName}
                 onDefinitionChange={workspace.setDefinition}
-                onTogglePreview={() => workspace.setPreview(!workspace.preview)}
+                onViewChange={workspace.setView}
                 onSave={() => void workspace.saveDraft()}
                 onPublish={() => void workspace.publish()}
                 onToggleAvailability={() => void workspace.toggleAvailability()}
               />
 
-              {workspace.preview ? (
+              {workspace.view === 'preview' ? (
                 <div className="card">
                   <div className="preview">
                     <div className="preview-head">
@@ -114,6 +115,8 @@ export function CmsApp() {
                     </div>
                   </div>
                 </div>
+              ) : workspace.view === 'json' ? (
+                <JsonPreviewPanel definition={workspace.definition} editorErrors={workspace.editorErrors} />
               ) : (
                 <DefinitionEditor
                   definition={workspace.definition}

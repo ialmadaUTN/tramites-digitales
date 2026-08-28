@@ -54,7 +54,11 @@ describe('listado del CMS · estado de disponibilidad', () => {
   });
 });
 
-function renderHeader(overrides: { published?: boolean; paused?: boolean; onToggleAvailability?: () => void } = {}) {
+function renderHeader(
+  overrides: { published?: boolean; paused?: boolean; onToggleAvailability?: () => void } = {},
+  view: 'structure' | 'preview' | 'json' = 'structure',
+  onViewChange: (view: 'structure' | 'preview' | 'json') => void = () => {},
+) {
   const definition: FormDefinition = INITIAL_DEFINITION;
   const onToggleAvailability = overrides.onToggleAvailability ?? vi.fn();
   render(
@@ -66,12 +70,12 @@ function renderHeader(overrides: { published?: boolean; paused?: boolean; onTogg
       editorErrors={collectDefinitionEditorErrors(definition, 'Denuncia')}
       status={null}
       saving={false}
-      preview={false}
+      view={view}
       published={overrides.published ?? true}
       paused={overrides.paused ?? false}
       onNameChange={() => {}}
       onDefinitionChange={() => {}}
-      onTogglePreview={() => {}}
+      onViewChange={onViewChange}
       onSave={() => {}}
       onPublish={() => {}}
       onToggleAvailability={onToggleAvailability}
@@ -109,6 +113,25 @@ describe('workspace del CMS · pausar y reactivar', () => {
   });
 });
 
+describe('workspace del CMS · selector de vista', () => {
+  it('ofrece Estructura, Vista Previa y JSON, y marca activa la vista actual', () => {
+    renderHeader({}, 'json');
+    expect(screen.getByRole('button', { name: /Estructura/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Vista Previa/ })).toBeTruthy();
+    const jsonButton = screen.getByRole('button', { name: /JSON/ });
+    expect(jsonButton.className).toContain('active');
+  });
+
+  it('clickear una pestaña avisa el cambio de vista, sin decidirlo localmente', async () => {
+    const onViewChange = vi.fn();
+    renderHeader({}, 'structure', onViewChange);
+
+    await userEvent.click(screen.getByRole('button', { name: /JSON/ }));
+
+    expect(onViewChange).toHaveBeenCalledWith('json');
+  });
+});
+
 describe('workspace del CMS · completitud estructural', () => {
   function renderWithDefinition(definition: FormDefinition) {
     const onPublish = vi.fn();
@@ -122,12 +145,12 @@ describe('workspace del CMS · completitud estructural', () => {
         editorErrors={collectDefinitionEditorErrors(definition, 'Demo')}
         status={null}
         saving={false}
-        preview={false}
+        view="structure"
         published={false}
         paused={false}
         onNameChange={() => {}}
         onDefinitionChange={() => {}}
-        onTogglePreview={() => {}}
+        onViewChange={() => {}}
         onSave={onSave}
         onPublish={onPublish}
         onToggleAvailability={() => {}}
