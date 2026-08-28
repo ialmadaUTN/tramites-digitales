@@ -1,0 +1,65 @@
+services:
+  - type: web
+    name: tramites-web
+    runtime: node
+    plan: free
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter web... build
+    startCommand: pnpm --filter web start
+    healthCheckPath: /
+    envVars:
+      - key: NEXT_PUBLIC_BFF_URL
+        sync: false
+      - key: NEXT_PUBLIC_REMOTE_ORIGIN
+        sync: false
+      - key: FORM_CONTEXT_JWT_SECRET
+        sync: false
+      - key: DEMO_INSURANCE_CODE
+        value: '2050'
+
+  - type: web
+    name: tramites-bff
+    runtime: node
+    plan: free
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter bff... build
+    startCommand: node apps/bff/dist/main.js
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: SUPABASE_DB_SCHEMA
+        value: public
+      - key: WEB_ORIGIN
+        sync: false
+      - key: DYNAMICS_MOCK_URL
+        sync: false
+      - key: FORM_CONTEXT_JWT_SECRET
+        sync: false
+      - key: DELIVERY_TIMEOUT_MS
+        value: '3000'
+      - key: FORM_UPLOADS_ENABLED
+        value: 'false'
+      - key: FORM_UPLOADS_AUTHENTICATED
+        value: 'false'
+      - key: FORM_UPLOADS_MALWARE_SCANNED
+        value: 'false'
+
+  - type: web
+    name: tramites-form-remote
+    runtime: node
+    plan: free
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter form-remote... build
+    startCommand: pnpm --filter form-remote exec vite preview --host 0.0.0.0 --port $PORT
+    healthCheckPath: /mf-manifest.json
+
+  - type: web
+    name: tramites-dynamics-mock
+    runtime: node
+    plan: free
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter dynamics-mock... build
+    startCommand: node apps/dynamics-mock/dist/main.js
+    healthCheckPath: /health
+    envVars:
+      - key: MOCK_FORCE_FAILURE
+        value: 'false'

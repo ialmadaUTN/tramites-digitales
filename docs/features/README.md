@@ -17,15 +17,16 @@ La regla completa está en [`AGENTS.md`](../../AGENTS.md) en la raíz del reposi
 
 ## Índice
 
-| Documento | Cubre |
-| --- | --- |
-| [Editor de formularios](editor-de-formularios.md) | El CMS: tipos de campo, reglas de validación, catálogos de opciones, valores por defecto y la validación previa al guardado. |
-| [Campos de solo lectura](campos-de-solo-lectura.md) | Campos visibles pero no editables, y cómo se garantiza su valor del lado del servidor. |
-| [Lógica condicional](logica-condicional.md) | Visibilidad, habilitación y obligatoriedad condicionales entre campos. |
-| [Bloques informativos](bloques-informativos.md) | Bloques de texto y visibilidad contextual dentro de una sección. |
-| [Grillas repetibles](grillas-repetibles.md) | Contenedores de filas repetibles y sus columnas. |
-| [Pausa de formularios](pausa-de-formularios.md) | Sacar de circulación un formulario publicado y reactivarlo: qué se bloquea, con qué código HTTP y cómo se comporta ante caché, reintentos y sesiones abiertas. |
-| [Bloques informativos FAQ](bloques-informativos-faq.md) | Preguntas frecuentes configurables desde el CMS, mostradas como acordeones accesibles en el runtime. No participan de la validación ni del payload. |
+| Documento                                               | Cubre                                                                                                                                                          |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Editor de formularios](editor-de-formularios.md)       | El CMS: tipos de campo, reglas de validación, catálogos de opciones, valores por defecto y la validación previa al guardado.                                   |
+| [Campos de solo lectura](campos-de-solo-lectura.md)     | Campos visibles pero no editables, y cómo se garantiza su valor del lado del servidor.                                                                         |
+| [Lógica condicional](logica-condicional.md)             | Visibilidad, habilitación y obligatoriedad condicionales entre campos.                                                                                         |
+| [Bloques informativos](bloques-informativos.md)         | Bloques de texto y visibilidad contextual dentro de una sección.                                                                                               |
+| [Grillas repetibles](grillas-repetibles.md)             | Contenedores de filas repetibles y sus columnas.                                                                                                               |
+| [Pausa de formularios](pausa-de-formularios.md)         | Sacar de circulación un formulario publicado y reactivarlo: qué se bloquea, con qué código HTTP y cómo se comporta ante caché, reintentos y sesiones abiertas. |
+| [Bloques informativos FAQ](bloques-informativos-faq.md) | Preguntas frecuentes configurables desde el CMS, mostradas como acordeones accesibles en el runtime. No participan de la validación ni del payload.            |
+| [Despliegue en Render](despliegue-render.md)            | Arquitectura y configuración para publicar el CMS, el BFF, el renderer federado y el mock de Dynamics.                                                         |
 
 ## Qué no va acá
 

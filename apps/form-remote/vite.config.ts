@@ -14,6 +14,6 @@ export default defineConfig({
     }),
   ],
   server: { origin: 'http://localhost:3002', cors: true, hmr: false },
-  preview: { host: '127.0.0.1', port: 3002 },
+  preview: { host: '127.0.0.1', port: 3002, cors: true },
   build: { target: 'es2022' },
 });

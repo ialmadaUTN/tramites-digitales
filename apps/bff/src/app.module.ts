@@ -10,10 +10,29 @@ import { DynamicsClient } from './dynamics.client';
 import { TipificationRegistry } from './tipification.registry';
 import { UploadsController } from './uploads.controller';
 import { UploadsService } from './uploads.service';
+import { HealthController } from './health.controller';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: ['../../.env.local', '../../.env', '.env'] })],
-  controllers: [FormsController, RuntimeController, SubmissionsController, UploadsController],
-  providers: [SupabaseService, FormsService, SubmissionsService, DynamicsClient, TipificationRegistry, UploadsService],
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: ['../../.env.local', '../../.env', '.env'],
+    }),
+  ],
+  controllers: [
+    FormsController,
+    RuntimeController,
+    SubmissionsController,
+    UploadsController,
+    HealthController,
+  ],
+  providers: [
+    SupabaseService,
+    FormsService,
+    SubmissionsService,
+    DynamicsClient,
+    TipificationRegistry,
+    UploadsService,
+  ],
 })
 export class AppModule {}
