@@ -65,6 +65,26 @@ describe('JsonPreviewPanel', () => {
     expect(alertText).not.toContain('Invalid input');
   });
 
+  it('informa errores de contenedores y campos, no solo los del formulario', () => {
+    const broken: FormDefinition = {
+      ...validDefinition,
+      containers: [{ ...validDefinition.containers[0]!, title: '' }],
+    };
+    renderPanel(broken);
+    const alertText = screen.getByRole('alert').textContent ?? '';
+    expect(alertText).toContain('El título del contenedor es obligatorio');
+  });
+
+  it('cuando el editor no marcó nada, recurre a los issues crudos de Zod', () => {
+    // Un título de más de 200 caracteres no lo marca el editor (solo chequea
+    // que no esté vacío), pero sí lo rechaza `formDefinitionSchema`. Es el
+    // único caso en que el panel debe apoyarse en el fallback de Zod.
+    const broken: FormDefinition = { ...validDefinition, title: 'a'.repeat(201) };
+    renderPanel(broken);
+    const alertText = screen.getByRole('alert').textContent ?? '';
+    expect(alertText).toContain('title');
+  });
+
   it('sin errores, no muestra ningún aviso', () => {
     renderPanel(validDefinition);
     expect(screen.queryByRole('alert')).toBeNull();
