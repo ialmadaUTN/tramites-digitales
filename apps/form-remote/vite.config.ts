@@ -14,6 +14,11 @@ export default defineConfig({
     }),
   ],
   server: { origin: 'http://localhost:3002', cors: true, hmr: false },
-  preview: { host: '127.0.0.1', port: 3002, cors: true },
+  preview: {
+    host: '127.0.0.1',
+    port: 3002,
+    cors: true,
+    allowedHosts: ['tramites-form-remote.onrender.com'],
+  },
   build: { target: 'es2022' },
 });
