@@ -21,7 +21,7 @@ Flujo de autoría: crear → editar → **Guardar** (borrador) → **Publicar** 
 
 Una vez publicado, el formulario se puede sacar de circulación sin despublicarlo: ver [pausa de formularios](pausa-de-formularios.md). Publicar una versión nueva no reactiva un formulario pausado, y la vista previa del borrador sigue funcionando aunque lo esté.
 
-Los recorridos E2E que crean formularios (`tests/e2e/authoring-journey.spec.ts` y `tests/e2e/form-flow.spec.ts`) usan formularios reales para verificar el CMS y la cadena CMS → BFF → Supabase → host. Cada `afterEach` registra el ID desde el momento de la creación y elimina sus submissions, los uploads cuando el schema REST los expone y el formulario al terminar, incluso si una aserción posterior falla; las versiones publicadas se eliminan por cascade de la base.
+Los recorridos E2E que crean formularios (`tests/e2e/authoring-journey.spec.ts`, `tests/e2e/form-flow.spec.ts`, `tests/e2e/faq-journey.spec.ts` y `tests/e2e/json-preview-journey.spec.ts`) usan formularios reales para verificar el CMS y la cadena CMS → BFF → Supabase → host. Cada `afterEach` registra el ID desde el momento de la creación y elimina sus submissions, los uploads cuando el schema REST los expone y el formulario al terminar, incluso si una aserción posterior falla; las versiones publicadas se eliminan por cascade de la base.
 
 ### Estructura
 
