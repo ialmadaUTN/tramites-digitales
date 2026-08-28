@@ -85,6 +85,16 @@ describe('JsonPreviewPanel', () => {
     expect(alertText).toContain('title');
   });
 
+  it('un formulario sin contenedores avisa la falta de completitud estructural, aunque el schema base lo acepte', () => {
+    // `formDefinitionSchema` (a diferencia de `publishableFormDefinitionSchema`)
+    // acepta `containers: []`, así que sin esto el panel se quedaría mudo
+    // justo cuando Publicar está bloqueado por esa misma razón.
+    const empty: FormDefinition = { ...validDefinition, containers: [] };
+    renderPanel(empty);
+    const alertText = screen.getByRole('alert').textContent ?? '';
+    expect(alertText).toContain('El formulario debe tener al menos un contenedor');
+  });
+
   it('sin errores, no muestra ningún aviso', () => {
     renderPanel(validDefinition);
     expect(screen.queryByRole('alert')).toBeNull();

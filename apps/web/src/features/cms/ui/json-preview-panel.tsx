@@ -21,7 +21,7 @@ function pushRecordMessages(messages: string[], record: Record<string, Record<st
 
 function collectMessages(editorErrors: DefinitionEditorErrors): string[] {
   const messages: string[] = [];
-  for (const message of [editorErrors.name, editorErrors.title, editorErrors.submitLabel, editorErrors.tipificationKey, editorErrors.conditions]) {
+  for (const message of [editorErrors.name, editorErrors.title, editorErrors.submitLabel, editorErrors.tipificationKey, editorErrors.conditions, editorErrors.structure]) {
     if (message) messages.push(message);
   }
   pushRecordMessages(messages, editorErrors.containers);
