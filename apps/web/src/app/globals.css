@@ -606,6 +606,37 @@ button, input, textarea, select {
   box-shadow: var(--shadow-sm);
 }
 
+/* JSON preview panel */
+.json-preview-errors {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-sm);
+  background: var(--danger-light);
+  color: #991b1b;
+}
+
+.json-preview-errors ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.json-preview-code {
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--soft);
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 70vh;
+  overflow: auto;
+}
+
 /* Form Controls & Grid */
 .form-grid {
   display: grid;

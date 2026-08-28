@@ -9,6 +9,7 @@ import { INITIAL_DEFINITION } from '../model/constants';
 import { collectDefinitionEditorErrors } from '../model/editor-validation';
 
 export type WorkspaceStatus = { text: string; error?: boolean };
+export type WorkspaceView = 'structure' | 'preview' | 'json';
 
 export function useCmsWorkspace(api: FormsApi = formsApi) {
   const [forms, setForms] = useState<FormSummary[]>([]);
@@ -17,7 +18,7 @@ export function useCmsWorkspace(api: FormsApi = formsApi) {
   const [definition, setDefinition] = useState<FormDefinition>(INITIAL_DEFINITION);
   const [status, setStatus] = useState<WorkspaceStatus | null>(null);
   const [saving, setSaving] = useState(false);
-  const [preview, setPreview] = useState(false);
+  const [view, setView] = useState<WorkspaceView>('structure');
   const selected = useMemo(() => forms.find((form) => form.id === selectedId), [forms, selectedId]);
   const editorErrors = useMemo(() => collectDefinitionEditorErrors(definition, name), [definition, name]);
 
@@ -42,7 +43,7 @@ export function useCmsWorkspace(api: FormsApi = formsApi) {
   async function selectForm(formId: string) {
     if (selectedId) unsavedDraftsRef.current.set(selectedId, { name, definition });
     setSelectedId(formId);
-    setPreview(false);
+    setView('structure');
     setStatus(null);
 
     const pending = unsavedDraftsRef.current.get(formId);
@@ -75,7 +76,7 @@ export function useCmsWorkspace(api: FormsApi = formsApi) {
   async function saveDraft() {
     if (!selectedId) return false;
     if (editorErrors.hasErrors) {
-      setPreview(false);
+      setView('structure');
       setStatus({ text: 'Revisá los campos marcados antes de guardar', error: true });
       return false;
     }
@@ -100,7 +101,7 @@ export function useCmsWorkspace(api: FormsApi = formsApi) {
     // Un borrador incompleto se guarda pero no se publica: el aviso tiene que
     // decir qué falta, no fallar recién contra el BFF.
     if (!editorErrors.canPublish) {
-      setPreview(false);
+      setView('structure');
       setStatus({ text: editorErrors.structure ?? 'Completá los contenedores marcados antes de publicar', error: true });
       return;
     }
@@ -145,8 +146,8 @@ export function useCmsWorkspace(api: FormsApi = formsApi) {
     editorErrors,
     status,
     saving,
-    preview,
-    setPreview,
+    view,
+    setView,
     selectForm,
     createForm,
     saveDraft,

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { FormDefinition } from '@tramites/form-contracts';
-import type { WorkspaceStatus } from '../hooks/use-cms-workspace';
+import type { WorkspaceStatus, WorkspaceView } from '../hooks/use-cms-workspace';
 import type { DefinitionEditorErrors } from '../model/editor-validation';
 
 type WorkspaceHeaderProps = {
@@ -13,12 +13,12 @@ type WorkspaceHeaderProps = {
   editorErrors: DefinitionEditorErrors;
   status: WorkspaceStatus | null;
   saving: boolean;
-  preview: boolean;
+  view: WorkspaceView;
   published: boolean;
   paused: boolean;
   onNameChange: (name: string) => void;
   onDefinitionChange: (definition: FormDefinition) => void;
-  onTogglePreview: () => void;
+  onViewChange: (view: WorkspaceView) => void;
   onSave: () => void;
   onPublish: () => void;
   onToggleAvailability: () => void;
@@ -32,12 +32,12 @@ export function WorkspaceHeader({
   editorErrors,
   status,
   saving,
-  preview,
+  view,
   published,
   paused,
   onNameChange,
   onDefinitionChange,
-  onTogglePreview,
+  onViewChange,
   onSave,
   onPublish,
   onToggleAvailability,
@@ -77,8 +77,8 @@ export function WorkspaceHeader({
           <div className="segmented-control">
             <button
               type="button"
-              className={`segmented-btn ${!preview ? 'active' : ''}`}
-              onClick={() => preview && onTogglePreview()}
+              className={`segmented-btn ${view === 'structure' ? 'active' : ''}`}
+              onClick={() => onViewChange('structure')}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 20h9" />
@@ -88,14 +88,25 @@ export function WorkspaceHeader({
             </button>
             <button
               type="button"
-              className={`segmented-btn ${preview ? 'active' : ''}`}
-              onClick={() => !preview && onTogglePreview()}
+              className={`segmented-btn ${view === 'preview' ? 'active' : ''}`}
+              onClick={() => onViewChange('preview')}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                 <circle cx="12" cy="12" r="3" />
               </svg>
               Vista Previa
+            </button>
+            <button
+              type="button"
+              className={`segmented-btn ${view === 'json' ? 'active' : ''}`}
+              onClick={() => onViewChange('json')}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="16 18 22 12 16 6" />
+                <polyline points="8 6 2 12 8 18" />
+              </svg>
+              JSON
             </button>
           </div>
 
