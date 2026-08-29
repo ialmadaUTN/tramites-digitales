@@ -18,6 +18,16 @@ test('carga el formulario por ID desde el host federado', async ({ page }) => {
   await expect(page.getByText(/Hubo testigos/)).toBeVisible();
 });
 
+test('el BFF permite el origen público de la preview', async ({ request }) => {
+  const response = await request.get('http://localhost:3001/api/v1/forms', {
+    headers: { Origin: 'https://tramites-web-preview.onrender.com' },
+  });
+
+  expect(response.ok()).toBeTruthy();
+  expect(response.headers()['access-control-allow-origin']).toBe('https://tramites-web-preview.onrender.com');
+  expect(await response.json()).toEqual(expect.any(Array));
+});
+
 test('permite crear un formulario desde el CMS', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('button', { name: /Denuncia de siniestro/ })).toBeVisible({ timeout: 15_000 });
