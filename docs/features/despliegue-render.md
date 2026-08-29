@@ -35,7 +35,7 @@ La preview reutiliza los servicios auxiliares existentes (`https://tramites-bff.
 - Todos los servidores HTTP deben escuchar en `0.0.0.0` y en el `PORT` provisto por Render. Los defaults locales siguen usando `127.0.0.1` y los puertos 3000–3003.
 - `SUPABASE_SECRET_KEY` solo se configura en `tramites-bff`; nunca debe ser una variable `NEXT_PUBLIC_*` ni exponerse al navegador.
 - `FORM_CONTEXT_JWT_SECRET` debe tener el mismo valor en `tramites-web` y `tramites-bff` para que el host pueda firmar contextos y el BFF verificarlos.
-- `WEB_ORIGIN` debe coincidir con el origen público de `tramites-web`; restringe el CORS del BFF.
+- `WEB_ORIGIN` restringe el CORS del BFF. Acepta una lista separada por comas para permitir el frontend principal y la preview (`apps/bff/src/cors.ts`); no se debe usar `*`.
 - El renderer necesita CORS para ser cargado por un host con otro origen. La configuración de preview de Vite lo habilita y permite explícitamente el hostname público `tramites-form-remote.onrender.com` mediante `preview.allowedHosts`.
 - Los uploads siguen deshabilitados por defecto. No se deben activar en internet hasta conectar autenticación y análisis antimalware reales.
 - `tramites-dynamics-mock` es solo una dependencia de demostración. Para producción real, `DYNAMICS_MOCK_URL` debe reemplazarse por el endpoint autenticado de Dynamics y el mock no debe publicarse.
@@ -46,7 +46,7 @@ La preview reutiliza los servicios auxiliares existentes (`https://tramites-bff.
 Render solicita las variables marcadas con `sync: false` al aplicar el Blueprint:
 
 - En `tramites-web`: `NEXT_PUBLIC_BFF_URL`, `NEXT_PUBLIC_REMOTE_ORIGIN` y `FORM_CONTEXT_JWT_SECRET`.
-- En `tramites-bff`: `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `WEB_ORIGIN`, `DYNAMICS_MOCK_URL` y el mismo `FORM_CONTEXT_JWT_SECRET`.
+- En `tramites-bff`: `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `WEB_ORIGIN` (una o más URLs separadas por comas), `DYNAMICS_MOCK_URL` y el mismo `FORM_CONTEXT_JWT_SECRET`.
 
 Las URLs públicas se conocen después de crear los servicios. Por eso se cargan luego de obtener los dominios `onrender.com`, o se reemplazan por dominios propios cuando existan.
 
@@ -66,6 +66,7 @@ Las URLs públicas se conocen después de crear los servicios. Por eso se cargan
 ## Historial de cambios
 
 - **2026-08-29** — Se creó la rama `preview` y el servicio `tramites-web-preview` para publicar solo el frontend de Next.js, reutilizando el BFF y el renderer existentes mediante sus URLs públicas.
+- **2026-08-29** — El BFF acepta múltiples orígenes en `WEB_ORIGIN` para que la rama `preview` pueda listar y crear formularios sin relajar CORS; se agregó cobertura de la normalización en `apps/bff/src/cors.test.ts`.
 - **2026-08-28** — Se agregó el Blueprint inicial de Render con servicios separados para Next.js, NestJS, Module Federation y el mock de Dynamics; se adaptaron los procesos HTTP a `PORT`/`0.0.0.0`, se agregó el health check del BFF y se documentaron las variables, CORS y restricciones del despliegue.
 - **2026-08-28** — Las exportaciones de `@tramites/form-contracts` usan `dist` bajo Node en producción y conservan `src` para desarrollo y bundlers, evitando que el BFF y el mock intenten cargar archivos `.js` inexistentes junto a los fuentes TypeScript.
 - **2026-08-28** — Se agregó el hostname público del renderer a `preview.allowedHosts` de Vite para evitar el 403 que produce la protección de host al servir el manifiesto desde Render.
