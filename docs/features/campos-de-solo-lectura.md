@@ -14,7 +14,7 @@ Se declara con `readOnly: true` en el campo. El comportamiento se reparte en tre
 
 ### 1. Editor (CMS)
 
-Una casilla **"Solo lectura"** en cada campo, disponible también en las columnas de una grilla. El campo muestra una insignia "Solo lectura" en su encabezado.
+Una tarjeta **"Solo lectura"** en cada campo, disponible también en las columnas de una grilla. Para no saturar el editor, se agrega desde el menú **Agregar configuración** y queda plegada hasta que se necesita; el campo muestra una insignia "Solo lectura" en su encabezado cuando está activa.
 
 ### 2. Runtime (formulario publicado)
 
@@ -59,5 +59,6 @@ Las tres primeras las verifica el contrato al guardar y el editor antes de guard
 
 ## Historial de cambios
 
+- **2026-08-29** — La casilla de solo lectura pasó a una tarjeta opcional que se agrega desde el menú del editor de campo, conservando la configuración existente y la insignia del encabezado.
 - **2026-08-20** — Se agregó la funcionalidad: propiedad `readOnly` en el contrato, casilla en el editor (incluidas columnas de grilla), bloqueo diferenciado por tipo de control en el runtime, y sustitución del valor recibido por el declarado en la validación del envío.
 - **2026-08-22** — La exigencia de `defaultValue` pasó a cubrir también la obligatoriedad condicional: antes solo miraba la fija, así que un campo de solo lectura con obligatoriedad condicional se podía publicar y quedaba imposible de completar cuando la condición se cumplía.

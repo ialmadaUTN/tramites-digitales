@@ -82,6 +82,8 @@ Hay dos formas de declarar que un campo es obligatorio, y **son excluyentes**:
 
 **Declarar las dos está prohibido.** Es ambiguo y falla en silencio: la fija gana y la condición queda muerta, así que el autor cree haber configurado *"obligatorio cuando X"* y en realidad configuró *"siempre obligatorio"*. El contrato lo rechaza aunque se llame a la API directamente, y el editor deshabilita la opción que sobra en cuanto una de las dos está activa.
 
+En el editor, **Obligatoriedad** y **Lógica condicional** son tarjetas opcionales que se agregan desde el menú del campo. Si una definición ya las tiene, se muestran plegadas con un resumen; al abrirlas, la opción que entra en conflicto queda deshabilitada. Una definición antigua que trae ambas activas mantiene las dos editables para poder repararla.
+
 Con una excepción deliberada: si una definición **ya trae las dos** —guardada antes de esta regla—, el editor **no bloquea ninguna**, para que se pueda desmarcar una y repararla. Bloquear ambas la dejaría sin salida: no se puede guardar por el conflicto y no se puede resolver el conflicto. Apenas queda una sola activa, el bloqueo vuelve.
 
 ### Solo lectura y obligatoriedad
@@ -132,6 +134,7 @@ Los campos ocultos o excluidos no se validan ni viajan. Un campo deshabilitado n
 
 ## Historial de cambios
 
+- **2026-08-29** — Obligatoriedad y Lógica condicional pasaron a tarjetas opcionales del editor, con apertura automática de errores y una salida explícita para reparar definiciones antiguas conflictivas.
 - **2026-08-20** — El editor pasó de una única regla con cuatro operadores a reglas múltiples con los diez operadores del contrato, selector visual de lógica `all`/`any` y valores múltiples para `in`/`notIn`. Se corrigió el selector de campos candidatos, que ofrecía celdas de grilla y producía definiciones que el BFF rechazaba.
 - **2026-08-21** — Se agregaron definiciones v3, variables externas tipadas, grupos anidados, inclusión independiente, condiciones jerárquicas y revalidación mediante contexto firmado en el BFF.
 - **2026-08-21** — Se fijó la compatibilidad entre obligatoriedad fija y lógica condicional. Declarar `rules.required` junto con `conditions.required` pasó a ser inválido: el contrato lo rechaza aunque se llame a la API directamente, y el editor deshabilita la opción que sobra. La obligatoriedad fija con visibilidad, inclusión o habilitación condicional queda definida como "obligatorio cuando está visible, incluido y habilitado".

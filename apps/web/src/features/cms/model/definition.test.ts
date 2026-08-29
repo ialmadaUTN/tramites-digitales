@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { FormDefinition } from '@tramites/form-contracts';
+import type { AllowedMimeType, FormDefinition } from '@tramites/form-contracts';
 import {
   addContainer,
   addFaqBlock,
@@ -10,6 +10,7 @@ import {
   addConditionRule,
   addOption,
   changeFieldType,
+  clearFieldConfiguration,
   moveContainer,
   moveFaqBlock,
   moveField,
@@ -193,6 +194,42 @@ describe('definition mutations', () => {
     expect(setFieldRule(setFieldRule(field, 'required', true), 'required', false).rules.required).toBeUndefined();
     expect(setFieldErrorMessage(field, 'required', 'Obligatorio').rules.errorMessages?.required).toBe('Obligatorio');
     expect(setFieldErrorMessage(setFieldErrorMessage(field, 'required', 'Obligatorio'), 'required', ' ').rules.errorMessages).toBeUndefined();
+  });
+
+  it('limpia cada tarjeta de configuración sin tocar la identidad del campo', () => {
+    const configured = {
+      ...definition.containers[0]!.fields[0]!,
+      placeholder: 'Ayuda',
+      helpText: 'Detalle',
+      width: 'half' as const,
+      defaultValue: 'Inicial',
+      maskKind: 'dni_ar' as const,
+      readOnly: true,
+      minFiles: 1,
+      maxFiles: 2,
+      allowedMimeTypes: ['application/pdf'] as AllowedMimeType[],
+      conditions: { visible: { logic: 'all' as const, rules: [{ fieldId: 'f2', operator: 'notEmpty' as const }] } },
+      rules: {
+        required: true,
+        minLength: 2,
+        maxLength: 8,
+        pattern: '^[A-Z]+$',
+        errorMessages: { required: 'Falta' },
+      },
+    };
+
+    expect(clearFieldConfiguration(configured, 'presentation')).toMatchObject({ fieldName: 'a', type: 'text', width: 'half' });
+    expect(clearFieldConfiguration(configured, 'presentation').placeholder).toBeUndefined();
+    expect(clearFieldConfiguration(configured, 'layout').width).toBe('full');
+    expect(clearFieldConfiguration(configured, 'defaultValue').defaultValue).toBeUndefined();
+    expect(clearFieldConfiguration(configured, 'required').rules.required).toBeUndefined();
+    expect(clearFieldConfiguration(configured, 'limits').rules).toEqual({ pattern: '^[A-Z]+$', required: true, errorMessages: { required: 'Falta' } });
+    expect(clearFieldConfiguration(configured, 'pattern').rules.pattern).toBeUndefined();
+    expect(clearFieldConfiguration(configured, 'mask').maskKind).toBeUndefined();
+    expect(clearFieldConfiguration(configured, 'messages').rules.errorMessages).toBeUndefined();
+    expect(clearFieldConfiguration(configured, 'readOnly').readOnly).toBeUndefined();
+    expect(clearFieldConfiguration(configured, 'files').allowedMimeTypes).toBeUndefined();
+    expect(clearFieldConfiguration(configured, 'conditions').conditions).toBeUndefined();
   });
 });
 

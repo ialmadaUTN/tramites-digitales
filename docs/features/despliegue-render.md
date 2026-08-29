@@ -24,6 +24,12 @@ El flujo observable sigue siendo el mismo:
 3. `apps/bff` aplica las reglas de `packages/form-contracts`, lee y escribe en Supabase y entrega la submission a `DYNAMICS_MOCK_URL`.
 4. Supabase sigue siendo el almacenamiento externo del proyecto; el Blueprint no crea otra base de datos.
 
+### Preview frontend-only
+
+La rama `preview` publica únicamente `apps/web` en el servicio `tramites-web-preview` (`https://tramites-web-preview.onrender.com`). Es un Web Service de Render separado del Blueprint principal, con auto-deploy para cada commit de esa rama y los comandos `pnpm --filter web... build` / `pnpm --filter web start`.
+
+La preview reutiliza los servicios auxiliares existentes (`https://tramites-bff.onrender.com/api/v1` y `https://tramites-form-remote.onrender.com`); no crea una segunda base, BFF, renderer ni mock. Por eso sigue dependiendo de que esos servicios estén disponibles. `FORM_CONTEXT_JWT_SECRET` no se carga automáticamente en la preview: los formularios que exigen variables externas confiables necesitan agregar el mismo secreto que usa el BFF desde la configuración segura de Render antes de probar ese recorrido.
+
 ## Reglas y restricciones
 
 - Todos los servidores HTTP deben escuchar en `0.0.0.0` y en el `PORT` provisto por Render. Los defaults locales siguen usando `127.0.0.1` y los puertos 3000–3003.

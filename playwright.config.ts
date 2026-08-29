@@ -3,6 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 const contextEnv = {
   FORM_CONTEXT_JWT_SECRET: process.env.FORM_CONTEXT_JWT_SECRET ?? 'e2e-context-secret',
   DEMO_INSURANCE_CODE: process.env.DEMO_INSURANCE_CODE ?? '2050',
+  WEB_ORIGIN: 'http://localhost:3000,https://tramites-web-preview.onrender.com',
 };
 
 export default defineConfig({
