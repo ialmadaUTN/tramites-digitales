@@ -35,6 +35,11 @@ function textBlockEditor(page: Page) {
   return page.locator('.container-editor').first().locator('.field-editor').filter({ hasText: 'Bloque informativo' });
 }
 
+async function addFieldConfiguration(field: ReturnType<typeof fieldEditor>, label: string | RegExp) {
+  await field.getByRole('button', { name: /Agregar configuración/ }).click();
+  await field.getByRole('menuitem', { name: typeof label === 'string' ? new RegExp(label) : label }).click();
+}
+
 let createdFormId: string | undefined;
 
 test.afterEach(async () => {
@@ -91,6 +96,7 @@ test('un formulario creado en el CMS se publica y se completa en el host', async
   await trustedInsuranceVariable.locator('select').nth(1).selectOption('trusted');
   await trustedVariable.locator('select').nth(1).selectOption('trusted');
 
+  await addFieldConfiguration(nombre, 'Lógica condicional');
   await nombre.getByLabel('Obligatoriedad condicional').check();
   const requiredCondition = nombre.locator('.condition-editor').filter({ hasText: 'Lógica condicional: Obligatoriedad' });
   await requiredCondition.locator('.condition-rule').locator('select').first().selectOption('external:variable1');
@@ -109,8 +115,11 @@ test('un formulario creado en el CMS se publica y se completa en el host', async
   const sucursal = fieldEditor(page, 2);
   await sucursal.locator('.form-group').filter({ hasText: 'Etiqueta visible (Label)' }).locator('input').fill('Sucursal');
   await sucursal.locator('.form-group').filter({ hasText: 'Nombre de clave de payload' }).locator('input').fill('sucursal');
+  await addFieldConfiguration(sucursal, 'Valor inicial');
   await sucursal.locator('.form-group').filter({ hasText: 'Valor inicial por defecto' }).locator('input').fill('Centro');
-  await sucursal.getByLabel('Solo lectura').check();
+  await addFieldConfiguration(sucursal, 'Solo lectura');
+  await sucursal.getByLabel('Solo lectura', { exact: true }).check();
+  await addFieldConfiguration(sucursal, 'Lógica condicional');
   await sucursal.getByLabel('Inclusión condicional').check();
   await sucursal.locator('.condition-rule').locator('select').first().selectOption('external:variable2');
   await sucursal.locator('.condition-rule').locator('input').fill('9999');

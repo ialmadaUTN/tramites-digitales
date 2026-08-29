@@ -55,19 +55,40 @@ function Harness({ initial }: { initial: FormDefinition }) {
 
 const produced = () => JSON.parse(screen.getByTestId('definicion').textContent!) as FormField;
 
+async function openCard(label: string) {
+  const heading = screen.getByText(label, { exact: true });
+  const card = heading.closest('.configuration-card');
+  if (!card) throw new Error(`No se encontró la tarjeta ${label}`);
+  const trigger = card.querySelector('.configuration-card-trigger') as HTMLButtonElement | null;
+  if (!trigger) throw new Error(`No se encontró el disparador de ${label}`);
+  if (trigger.getAttribute('aria-expanded') === 'false') await userEvent.click(trigger);
+}
+
+async function addConfiguration(label: string) {
+  await userEvent.click(screen.getByRole('button', { name: /Agregar configuración/ }));
+  await userEvent.click(screen.getByRole('menuitem', { name: new RegExp(label) }));
+}
+
 describe('editor de campo · obligatoriedad fija y condicional', () => {
-  it('con obligatorio fijo, la obligatoriedad condicional queda deshabilitada', () => {
+  it('con obligatorio fijo, la obligatoriedad condicional queda deshabilitada', async () => {
     render(<Harness initial={definitionWith({ rules: { required: true } })} />);
+    await openCard('Obligatoriedad');
+    await addConfiguration('Lógica condicional');
     expect(screen.getByLabelText('Obligatoriedad condicional').hasAttribute('disabled')).toBe(true);
   });
 
-  it('con obligatoriedad condicional, el obligatorio fijo queda deshabilitado', () => {
+  it('con obligatoriedad condicional, el obligatorio fijo queda deshabilitado', async () => {
     render(<Harness initial={definitionWith({ conditions: { required: pointsAtGate } })} />);
+    await addConfiguration('Obligatoriedad');
+    await openCard('Obligatoriedad');
+    await openCard('Lógica condicional');
     expect(screen.getByLabelText('Obligatorio').hasAttribute('disabled')).toBe(true);
   });
 
-  it('sin obligatoriedad, las dos opciones están disponibles', () => {
+  it('sin obligatoriedad, las dos opciones están disponibles', async () => {
     render(<Harness initial={definitionWith({})} />);
+    await addConfiguration('Obligatoriedad');
+    await addConfiguration('Lógica condicional');
     expect(screen.getByLabelText('Obligatorio').hasAttribute('disabled')).toBe(false);
     expect(screen.getByLabelText('Obligatoriedad condicional').hasAttribute('disabled')).toBe(false);
   });
@@ -75,6 +96,8 @@ describe('editor de campo · obligatoriedad fija y condicional', () => {
   it('marcar obligatorio no deja activar la condicional, y la definición sigue siendo válida', async () => {
     render(<Harness initial={definitionWith({})} />);
 
+    await addConfiguration('Obligatoriedad');
+    await addConfiguration('Lógica condicional');
     await userEvent.click(screen.getByLabelText('Obligatorio'));
 
     expect(produced().rules.required).toBe(true);
@@ -86,6 +109,7 @@ describe('editor de campo · obligatoriedad fija y condicional', () => {
   it('la visibilidad condicional sí convive con el obligatorio fijo', async () => {
     render(<Harness initial={definitionWith({ rules: { required: true } })} />);
 
+    await addConfiguration('Lógica condicional');
     await userEvent.click(screen.getByLabelText('Visibilidad condicional'));
 
     const target = produced();
@@ -93,8 +117,9 @@ describe('editor de campo · obligatoriedad fija y condicional', () => {
     expect(target.conditions?.visible).toBeDefined();
   });
 
-  it('explica la semántica del obligatorio fijo al autor', () => {
+  it('explica la semántica del obligatorio fijo al autor', async () => {
     render(<Harness initial={definitionWith({ rules: { required: true } })} />);
+    await openCard('Obligatoriedad');
     expect(screen.getByText(/Obligatorio siempre que el campo esté visible y habilitado/)).toBeTruthy();
   });
 });
@@ -108,8 +133,10 @@ describe('editor de campo · obligatoriedad fija y condicional', () => {
 describe('editor de campo · reparar una definición conflictiva', () => {
   const conflictiva = { rules: { required: true }, conditions: { required: pointsAtGate } };
 
-  it('con las dos activas, ninguna queda bloqueada', () => {
+  it('con las dos activas, ninguna queda bloqueada', async () => {
     render(<Harness initial={definitionWith(conflictiva)} />);
+    await openCard('Obligatoriedad');
+    await openCard('Lógica condicional');
 
     expect(screen.getByLabelText('Obligatorio').hasAttribute('disabled')).toBe(false);
     expect(screen.getByLabelText('Obligatoriedad condicional').hasAttribute('disabled')).toBe(false);
@@ -118,6 +145,7 @@ describe('editor de campo · reparar una definición conflictiva', () => {
   it('desmarcar la fija repara la definición y el contrato la acepta', async () => {
     render(<Harness initial={definitionWith(conflictiva)} />);
 
+    await openCard('Obligatoriedad');
     await userEvent.click(screen.getByLabelText('Obligatorio'));
 
     const target = produced();
@@ -129,6 +157,7 @@ describe('editor de campo · reparar una definición conflictiva', () => {
   it('desmarcar la condicional también repara', async () => {
     render(<Harness initial={definitionWith(conflictiva)} />);
 
+    await openCard('Lógica condicional');
     await userEvent.click(screen.getByLabelText('Obligatoriedad condicional'));
 
     const target = produced();
@@ -141,8 +170,10 @@ describe('editor de campo · reparar una definición conflictiva', () => {
     // El bloqueo tiene que volver, si no se podría recrear el conflicto.
     render(<Harness initial={definitionWith(conflictiva)} />);
 
+    await openCard('Lógica condicional');
     await userEvent.click(screen.getByLabelText('Obligatoriedad condicional'));
 
+    await openCard('Obligatoriedad');
     expect(screen.getByLabelText('Obligatoriedad condicional').hasAttribute('disabled')).toBe(true);
   });
 });

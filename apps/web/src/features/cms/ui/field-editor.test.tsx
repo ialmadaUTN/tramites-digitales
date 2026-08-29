@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { FieldType, FormDefinition, FormField } from '@tramites/form-contracts';
-import { FIELD_TYPES, OPTION_FIELD_TYPES, READ_ONLY_BLOCKED_FIELD_TYPES, REPEATER_FIELD_TYPES } from '../model/constants';
+import { FIELD_TYPES, OPTION_FIELD_TYPES, REPEATER_FIELD_TYPES } from '../model/constants';
 import { collectDefinitionEditorErrors } from '../model/editor-validation';
 import { ConditionEditor } from './condition-editor';
 import { FieldEditor } from './field-editor';
@@ -57,11 +57,10 @@ describe('FieldEditor renderiza todos los tipos de campo', () => {
 
     expect(markup).toContain('Etiqueta visible (Label)');
     expect(markup).toContain('Nombre de clave de payload');
-    expect(markup).toContain('Obligatorio');
-    // Los campos de catálogo muestran su editor de opciones; el resto no.
-    expect(markup.includes('Opciones configuradas')).toBe(OPTION_FIELD_TYPES.includes(type));
-    // Solo lectura está en todos menos donde el contrato lo prohíbe.
-    expect(markup.includes('Solo lectura')).toBe(!READ_ONLY_BLOCKED_FIELD_TYPES.includes(type));
+    expect(markup).toContain('Configuración opcional');
+    expect(markup).toContain('+ Agregar configuración');
+    // Los campos de catálogo muestran una tarjeta obligatoria; el resto la agrega desde el menú.
+    expect(markup.includes('Opciones del catálogo')).toBe(OPTION_FIELD_TYPES.includes(type));
   });
 
   it.each(REPEATER_FIELD_TYPES.map((type) => [type] as const))(
@@ -69,7 +68,7 @@ describe('FieldEditor renderiza todos los tipos de campo', () => {
     (type: FieldType) => {
       const markup = renderField(typedField(type), 'repeater');
 
-      expect(markup).toContain('Obligatorio');
+      expect(markup).toContain('Configuración opcional');
       expect(markup).not.toContain('Visibilidad condicional');
     },
   );
@@ -77,56 +76,55 @@ describe('FieldEditor renderiza todos los tipos de campo', () => {
 
 describe('FieldEditor', () => {
   it('ofrece obligatoriedad y solo lectura también en las celdas de una grilla', () => {
-    const markup = renderField(field(), 'repeater');
+    const markup = renderField(field({ rules: { required: true }, readOnly: true }), 'repeater');
 
-    expect(markup).toContain('Obligatorio');
+    expect(markup).toContain('Obligatoriedad');
     expect(markup).toContain('Solo lectura');
     expect(markup).not.toContain('Visibilidad condicional');
     expect(markup).toContain('Las celdas de una grilla no admiten lógica condicional');
   });
 
   it('no ofrece solo lectura en campos de archivos', () => {
-    const markup = renderField(field({ type: 'fileUpload' }));
+    const markup = renderField(field({ type: 'fileUpload', minFiles: 1 }));
 
-    expect(markup).toContain('Obligatorio');
+    expect(markup).toContain('Configuración opcional');
     expect(markup).not.toContain('Solo lectura');
-    expect(markup).toContain('Mínimo de archivos');
-    expect(markup).toContain('Tipos de archivo permitidos');
-    expect(markup).toContain('PDF');
-    expect(markup).toContain('JPG');
-    expect(markup).toContain('PNG');
+    expect(markup).toContain('Reglas de archivos');
+    expect(markup).not.toContain('Mínimo de archivos');
   });
 
   it('muestra reglas de longitud en todos los campos de texto', () => {
     for (const type of ['text', 'textarea', 'email', 'phone', 'alphabetic', 'alphanumeric'] as const) {
-      const markup = renderField(field({ type }));
-      expect(markup, type).toContain('Mínimo de caracteres');
-      expect(markup, type).toContain('Máximo de caracteres');
-      expect(markup, type).toContain('Mensaje de error (máximo de caracteres)');
+      const markup = renderField(field({ type, rules: { minLength: 1, maxLength: 100 } }));
+      expect(markup, type).toContain('Límites');
+      expect(markup, type).not.toContain('Mínimo de caracteres');
     }
-    expect(renderField(field({ type: 'number' }))).not.toContain('Mínimo de caracteres');
+    const numberMarkup = renderField(field({ type: 'number', rules: { min: 0, max: 100 } }));
+    expect(numberMarkup).toContain('Límites');
+    expect(numberMarkup).not.toContain('Mínimo de caracteres');
   });
 
   it('muestra únicamente máscaras compatibles con el tipo de campo', () => {
     expect(renderField(field({ type: 'alphabetic' }))).not.toContain('DNI');
-    expect(renderField(field({ type: 'phone' }))).toContain('Teléfono argentino');
-    expect(renderField(field({ type: 'phone' }))).not.toContain('CUIT');
+    const phoneMarkup = renderField(field({ type: 'phone', maskKind: 'cuit_ar' }));
+    expect(phoneMarkup).toContain('Teléfono argentino');
+    expect(phoneMarkup).not.toContain('value="cuit_ar"');
   });
 
   it('expone mensajes de error de formato y de tipo de dato', () => {
-    const markup = renderField(field());
+    const markup = renderField(field({ rules: { errorMessages: { pattern: 'Formato inválido' } } }));
 
-    expect(markup).toContain('Mensaje de error (formato inválido / regex)');
-    expect(markup).toContain('Mensaje de error (tipo de dato incorrecto)');
+    expect(markup).toContain('Mensajes de error');
+    expect(markup).not.toContain('Mensaje de error (formato inválido / regex)');
   });
 
   it('elige el valor por defecto desde el catálogo en campos de opciones', () => {
     const markup = renderField(
-      field({ type: 'select', options: [{ label: 'Robo', value: 'theft' }, { label: 'Choque', value: 'crash' }] }),
+      field({ type: 'select', defaultValue: 'theft', options: [{ label: 'Robo', value: 'theft' }, { label: 'Choque', value: 'crash' }] }),
     );
 
-    expect(markup).toContain('Sin valor inicial');
-    expect(markup).toContain('<option value="theft">Robo</option>');
+    expect(markup).toContain('Valor inicial');
+    expect(markup).not.toContain('Sin valor inicial');
   });
 
   it('reporta junto al campo los errores detectados antes de guardar', () => {

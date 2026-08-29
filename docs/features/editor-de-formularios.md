@@ -29,6 +29,14 @@ Una definición tiene **contenedores**, y cada contenedor tiene campos o ítems 
 
 Cada campo aporta una clave al payload final mediante su `fieldName`, que debe ser un identificador simple (empieza con letra o `_`, solo letras, números y `_`) y único dentro de su ámbito.
 
+### Configuración progresiva de campos
+
+Para evitar que cada campo llene la pantalla de controles, `apps/web/src/features/cms/ui/field-editor.tsx` muestra siempre solo la identidad del campo (etiqueta, `fieldName` y tipo). El resto se agrega desde **Agregar configuración** y aparece como una tarjeta independiente, compatible con el tipo y el contexto del campo.
+
+Las tarjetas cubren presentación (placeholder y ayuda), distribución, valor inicial, obligatoriedad, límites, regex, máscara, mensajes de error, solo lectura, archivos y lógica condicional. Las opciones de catálogo se muestran automáticamente porque `select`, `radio`, `combobox` y `multiselect` necesitan al menos una opción para ser válidos; el editor de opciones sigue usando las reglas de `packages/form-contracts/src/field-rules.ts`.
+
+Las tarjetas existentes se abren cerradas con un resumen para mantener la edición compacta. Una tarjeta que contiene un error se abre y se marca automáticamente para que ningún problema quede oculto. Quitar una tarjeta borra sus valores del borrador mediante `clearFieldConfiguration` en `apps/web/src/features/cms/model/definition.ts` y restaura el default del contrato cuando corresponde (por ejemplo, ancho completo). Esto no cambia el JSON aceptado por `packages/form-contracts`, ni el flujo de persistencia del BFF o el render del micro-frontend.
+
 ### Distribución en columnas
 
 Cada contenedor (sección o grilla) elige entre **1, 2, 3 o 4 columnas** (`container.columns`). El runtime (`apps/form-remote`) las renderiza como una grilla CSS con esa cantidad de columnas iguales, vía la clase `columns-N` en `apps/form-remote/src/features/runtime/ui/dynamic-form.tsx`. La Vista Previa del CMS usa el mismo componente y el mismo CSS (`apps/form-remote/src/styles.css`) — no hay una implementación de grilla separada para el editor.
@@ -208,6 +216,8 @@ Junto a "Estructura" y "Vista Previa", el workspace tiene una tercera pestaña *
 
 ## Historial de cambios
 
+- **2026-08-29** — El editor de campo pasó a configuración progresiva: etiqueta, clave y tipo quedan visibles; el resto se agrega desde un menú en tarjetas compactas, con apertura automática de errores y limpieza explícita al quitar una configuración.
+- **2026-08-29** — Se corrigió el formulario persistido `QA reglas externas`: el campo `channel` tenía obligatoriedad fija y condicional a la vez, una combinación que las validaciones actuales rechazan. Se conservó la obligatoriedad condicional en el borrador y en su versión publicada.
 - **2026-08-28** — Se agregó al workspace una pestaña "JSON" de solo lectura con la definición normalizada (mismo `formDefinitionSchema` que el BFF), que se actualiza en vivo, permite copiar el contenido e informa los errores de validación con los mismos mensajes que "Estructura" — incluida la completitud estructural, que el esquema base por sí solo no rechaza. Detalle en [Vista JSON](#vista-json).
 - **2026-08-21** — El E2E de autoría limpia el formulario creado y sus dependencias al finalizar para no acumular datos de prueba publicados.
 - **2026-08-20** — Se agregaron campos de solo lectura, reglas de longitud en todos los tipos de texto, mensajes de error de formato y de tipo, obligatoriedad configurable en columnas de grilla, editor de condiciones con reglas múltiples y todos los operadores, validación de catálogos y de valores por defecto, y validación previa al guardado para regex, duplicados, rangos, máscaras y parámetros no enteros.

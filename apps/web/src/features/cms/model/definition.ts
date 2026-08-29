@@ -430,3 +430,70 @@ export function setFieldErrorMessage(
   else delete rules.errorMessages;
   return { ...field, rules };
 }
+
+/**
+ * Configuraciones que el editor revela progresivamente. Son una preocupación
+ * de la capa de autoría: no cambian la forma del contrato ni lo que el BFF
+ * recibe, solo permiten volver a dejar un campo con sus valores por defecto.
+ */
+export type FieldConfigurationKey =
+  | 'presentation'
+  | 'layout'
+  | 'defaultValue'
+  | 'required'
+  | 'limits'
+  | 'pattern'
+  | 'mask'
+  | 'messages'
+  | 'readOnly'
+  | 'files'
+  | 'conditions';
+
+/** Quita una tarjeta de configuración y elimina sus valores persistibles. */
+export function clearFieldConfiguration(field: FormField, key: FieldConfigurationKey): FormField {
+  const next: FormField = { ...field, rules: { ...field.rules } };
+
+  switch (key) {
+    case 'presentation':
+      delete next.placeholder;
+      delete next.helpText;
+      break;
+    case 'layout':
+      next.width = 'full';
+      break;
+    case 'defaultValue':
+      delete next.defaultValue;
+      break;
+    case 'required':
+      delete next.rules.required;
+      break;
+    case 'limits':
+      delete next.rules.min;
+      delete next.rules.max;
+      delete next.rules.minLength;
+      delete next.rules.maxLength;
+      break;
+    case 'pattern':
+      delete next.rules.pattern;
+      break;
+    case 'mask':
+      delete next.maskKind;
+      break;
+    case 'messages':
+      delete next.rules.errorMessages;
+      break;
+    case 'readOnly':
+      delete next.readOnly;
+      break;
+    case 'files':
+      delete next.minFiles;
+      delete next.maxFiles;
+      delete next.allowedMimeTypes;
+      break;
+    case 'conditions':
+      delete next.conditions;
+      break;
+  }
+
+  return next;
+}

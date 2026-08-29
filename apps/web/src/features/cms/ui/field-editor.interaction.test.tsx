@@ -92,10 +92,134 @@ function control(labelText: string | RegExp): HTMLElement {
   return found as HTMLElement;
 }
 
+async function addConfiguration(user: ReturnType<typeof userEvent.setup>, label: string | RegExp) {
+  await user.click(screen.getByRole('button', { name: /Agregar configuración/ }));
+  await user.click(screen.getByRole('menuitem', { name: typeof label === 'string' ? new RegExp(label) : label }));
+}
+
 describe('FieldEditor — qué definición produce', () => {
+  it('filtra el menú según el tipo y el contexto del campo', async () => {
+    renderEditor(field({ type: 'fileUpload' }));
+    await screen.getByRole('button', { name: /Agregar configuración/ }).click();
+    expect(screen.queryByRole('menuitem', { name: /Solo lectura/ })).toBeNull();
+    expect(screen.getByRole('menuitem', { name: /Reglas de archivos/ })).toBeTruthy();
+
+    cleanup();
+    renderEditor(field(), 'repeater');
+    await screen.getByRole('button', { name: /Agregar configuración/ }).click();
+    expect(screen.queryByRole('menuitem', { name: /Lógica condicional/ })).toBeNull();
+  });
+
+  it('edita presentación, distribución y límites desde tarjetas independientes', async () => {
+    const editor = renderEditor(field());
+
+    await addConfiguration(editor.user, 'Textos de ayuda');
+    await editor.user.type(control('Texto borrador (Placeholder)'), 'Ingresá tu dato');
+    await editor.user.type(control('Texto de ayuda (Help text)'), 'Lo encontrás en la credencial');
+    expect(editor.field.placeholder).toBe('Ingresá tu dato');
+    expect(editor.field.helpText).toBe('Lo encontrás en la credencial');
+
+    await addConfiguration(editor.user, 'Distribución');
+    await editor.user.selectOptions(control('Ancho en pantalla'), 'half');
+    expect(editor.field.width).toBe('half');
+
+    await addConfiguration(editor.user, 'Límites');
+    await editor.user.type(control('Mínimo de caracteres'), '2');
+    await editor.user.type(control('Máximo de caracteres'), '40');
+    expect(editor.field.rules.minLength).toBe(2);
+    expect(editor.field.rules.maxLength).toBe(40);
+  });
+
+  it('elige valores iniciales para campos libres y casillas', async () => {
+    const numberEditor = renderEditor(field({ type: 'number' }));
+    await addConfiguration(numberEditor.user, 'Valor inicial');
+    await numberEditor.user.type(control('Valor inicial por defecto'), '42');
+    expect(numberEditor.field.defaultValue).toBe(42);
+
+    cleanup();
+    const checkboxEditor = renderEditor(field({ type: 'checkbox' }));
+    await addConfiguration(checkboxEditor.user, 'Valor inicial');
+    await checkboxEditor.user.selectOptions(control('Valor inicial por defecto'), 'true');
+    expect(checkboxEditor.field.defaultValue).toBe(true);
+  });
+
+  it('edita restricciones de archivos y conserva al menos un tipo permitido', async () => {
+    const editor = renderEditor(field({ type: 'fileUpload', minFiles: 1, maxFiles: 2, allowedMimeTypes: ['application/pdf'] }));
+    const filesHeading = screen.getByText('Reglas de archivos', { exact: true });
+    const filesCard = filesHeading.closest('.configuration-card');
+    if (!filesCard) throw new Error('No se encontró la tarjeta de archivos');
+    await editor.user.click(filesCard.querySelector('.configuration-card-trigger')!);
+
+    const min = control('Mínimo de archivos');
+    await editor.user.clear(min);
+    await editor.user.type(min, '2');
+    const max = control('Máximo de archivos');
+    await editor.user.clear(max);
+    await editor.user.type(max, '4');
+    expect(editor.field.minFiles).toBe(2);
+    expect(editor.field.maxFiles).toBe(4);
+
+    await editor.user.click(screen.getByLabelText('PDF'));
+    expect(editor.field.allowedMimeTypes).toEqual(['application/pdf']);
+    await editor.user.click(screen.getByLabelText('JPG'));
+    await editor.user.click(screen.getByLabelText('PNG'));
+    expect(editor.field.allowedMimeTypes).toBeUndefined();
+  });
+
+  it('permite editar opciones automáticas y alternar la vista masiva', async () => {
+    const editor = renderEditor(field({ type: 'select', options: [] }));
+
+    const optionsCard = screen.getByText('Opciones del catálogo', { exact: true }).closest('.configuration-card');
+    if (!optionsCard) throw new Error('No se encontró la tarjeta de catálogo');
+    const optionsEditor = within(optionsCard as HTMLElement);
+    await optionsEditor.getByRole('button', { name: '+ Agregar primera opción' }).click();
+    const firstInput = optionsCard.querySelector('.option-input') as HTMLInputElement | null;
+    if (!firstInput) throw new Error('No se encontró la primera opción');
+    await editor.user.clear(firstInput);
+    await editor.user.type(firstInput, 'Sí');
+    expect(editor.field.options?.[0]).toMatchObject({ label: 'Sí', value: 'si' });
+
+    await optionsEditor.getByRole('button', { name: 'Texto masivo' }).click();
+    const raw = optionsCard.querySelector('.options-textarea') as HTMLTextAreaElement;
+    await editor.user.clear(raw);
+    await editor.user.type(raw, 'si|Sí\nno|No');
+    expect(editor.field.options).toEqual([{ value: 'si', label: 'Sí' }, { value: 'no', label: 'No' }]);
+    await optionsEditor.getByRole('button', { name: 'Visual' }).click();
+    expect(optionsCard.textContent).toContain('Opciones configuradas');
+  });
+
+  it('mantiene las tarjetas plegadas y quitar una configuración limpia sus valores', async () => {
+    const editor = renderEditor(field({ placeholder: 'Ayuda breve' }));
+    const heading = screen.getByText('Textos de ayuda', { exact: true });
+    const card = heading.closest('.configuration-card');
+    if (!card) throw new Error('No se encontró la tarjeta de textos de ayuda');
+    const trigger = card.querySelector('.configuration-card-trigger');
+    if (!trigger) throw new Error('No se encontró el disparador de textos de ayuda');
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+
+    await editor.user.click(trigger);
+    expect(screen.getByDisplayValue('Ayuda breve')).toBeTruthy();
+    await editor.user.click(screen.getByRole('button', { name: 'Quitar configuración: Textos de ayuda' }));
+
+    expect(editor.field.placeholder).toBeUndefined();
+    expect(screen.queryByText('Textos de ayuda', { exact: true })).toBeNull();
+  });
+
+  it('abre automáticamente la tarjeta que contiene un error de definición', () => {
+    renderEditor(field({ rules: { pattern: '([a-z' } }));
+
+    const heading = screen.getByText('Expresión regular', { exact: true });
+    const card = heading.closest('.configuration-card');
+    if (!card) throw new Error('No se encontró la tarjeta de expresión regular');
+    const trigger = card.querySelector('.configuration-card-trigger');
+    expect(trigger?.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByText('La expresión regular no es válida')).toBeTruthy();
+  });
+
   it('marcar "Solo lectura" deja el campo en solo lectura y desmarcarlo borra la clave', async () => {
     const editor = renderEditor(field());
 
+    await addConfiguration(editor.user, 'Solo lectura');
     await editor.user.click(screen.getByLabelText('Solo lectura'));
     expect(editor.field.readOnly).toBe(true);
 
@@ -106,6 +230,7 @@ describe('FieldEditor — qué definición produce', () => {
   it('marcar "Obligatorio" en una celda de grilla llega a las reglas del campo', async () => {
     const editor = renderEditor(field(), 'repeater');
 
+    await addConfiguration(editor.user, 'Obligatoriedad');
     await editor.user.click(screen.getByLabelText('Obligatorio'));
     expect(editor.field.rules.required).toBe(true);
     // La celda obligatoria tiene que seguir siendo una definición válida.
@@ -116,6 +241,12 @@ describe('FieldEditor — qué definición produce', () => {
     const editor = renderEditor(field({ maskKind: 'cuit_ar' }));
     expect(editor.field.maskKind).toBe('cuit_ar');
 
+    const maskHeading = screen.getByText('Máscara', { exact: true });
+    const maskCard = maskHeading.closest('.configuration-card');
+    if (!maskCard) throw new Error('No se encontró la tarjeta de máscara');
+    const maskTrigger = maskCard.querySelector('.configuration-card-trigger');
+    if (!maskTrigger) throw new Error('No se encontró el disparador de máscara');
+    await editor.user.click(maskTrigger);
     await editor.user.selectOptions(control('Tipo de campo'), 'number');
 
     expect(editor.field.type).toBe('number');
@@ -136,6 +267,7 @@ describe('FieldEditor — qué definición produce', () => {
       field({ type: 'select', options: [{ label: 'Robo', value: 'theft' }, { label: 'Choque', value: 'crash' }] }),
     );
 
+    await addConfiguration(editor.user, 'Valor inicial');
     await editor.user.selectOptions(control('Valor inicial por defecto'), 'crash');
     expect(editor.field.defaultValue).toBe('crash');
 
@@ -148,6 +280,7 @@ describe('FieldEditor — qué definición produce', () => {
       field({ type: 'multiselect', options: [{ label: 'Rojo', value: 'red' }, { label: 'Azul', value: 'blue' }] }),
     );
 
+    await addConfiguration(editor.user, 'Valor inicial');
     await editor.user.click(screen.getByLabelText('Rojo'));
     await editor.user.click(screen.getByLabelText('Azul'));
     expect(editor.field.defaultValue).toEqual(['red', 'blue']);
@@ -159,6 +292,7 @@ describe('FieldEditor — qué definición produce', () => {
   it('escribir una regex inválida muestra el error sin esperar al guardado', async () => {
     const editor = renderEditor(field());
 
+    await addConfiguration(editor.user, 'Expresión regular');
     // `type` trata `[` y `{` como sintaxis de teclas especiales: pegamos el texto crudo.
     await editor.user.click(control('Expresión regular (Regex)'));
     await editor.user.paste('([a-z');
@@ -169,6 +303,7 @@ describe('FieldEditor — qué definición produce', () => {
 
   it('un mensaje de error personalizado vacío no deja la clave colgando', async () => {
     const editor = renderEditor(field());
+    await addConfiguration(editor.user, 'Mensajes de error');
     const input = control('Mensaje de error personalizado (Obligatorio)');
 
     await editor.user.type(input, 'Falta');
@@ -181,6 +316,7 @@ describe('FieldEditor — qué definición produce', () => {
   it('activar la visibilidad condicional crea una condición válida contra otro campo', async () => {
     const editor = renderEditor(field());
 
+    await addConfiguration(editor.user, 'Lógica condicional');
     await editor.user.click(screen.getByLabelText('Visibilidad condicional'));
 
     expect(editor.field.conditions?.visible?.logic).toBe('all');
