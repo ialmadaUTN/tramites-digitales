@@ -24,6 +24,12 @@ El flujo observable sigue siendo el mismo:
 3. `apps/bff` aplica las reglas de `packages/form-contracts`, lee y escribe en Supabase y entrega la submission a `DYNAMICS_MOCK_URL`.
 4. Supabase sigue siendo el almacenamiento externo del proyecto; el Blueprint no crea otra base de datos.
 
+### Preview frontend-only
+
+La rama `preview` publica únicamente `apps/web` en el servicio `tramites-web-preview` (`https://tramites-web-preview.onrender.com`). Es un Web Service de Render separado del Blueprint principal, con auto-deploy para cada commit de esa rama y los comandos `pnpm --filter web... build` / `pnpm --filter web start`.
+
+La preview reutiliza los servicios auxiliares existentes (`https://tramites-bff.onrender.com/api/v1` y `https://tramites-form-remote.onrender.com`); no crea una segunda base, BFF, renderer ni mock. Por eso sigue dependiendo de que esos servicios estén disponibles. `FORM_CONTEXT_JWT_SECRET` no se carga automáticamente en la preview: los formularios que exigen variables externas confiables necesitan agregar el mismo secreto que usa el BFF desde la configuración segura de Render antes de probar ese recorrido.
+
 ## Reglas y restricciones
 
 - Todos los servidores HTTP deben escuchar en `0.0.0.0` y en el `PORT` provisto por Render. Los defaults locales siguen usando `127.0.0.1` y los puertos 3000–3003.
@@ -59,6 +65,7 @@ Las URLs públicas se conocen después de crear los servicios. Por eso se cargan
 
 ## Historial de cambios
 
+- **2026-08-29** — Se creó la rama `preview` y el servicio `tramites-web-preview` para publicar solo el frontend de Next.js, reutilizando el BFF y el renderer existentes mediante sus URLs públicas.
 - **2026-08-28** — Se agregó el Blueprint inicial de Render con servicios separados para Next.js, NestJS, Module Federation y el mock de Dynamics; se adaptaron los procesos HTTP a `PORT`/`0.0.0.0`, se agregó el health check del BFF y se documentaron las variables, CORS y restricciones del despliegue.
 - **2026-08-28** — Las exportaciones de `@tramites/form-contracts` usan `dist` bajo Node en producción y conservan `src` para desarrollo y bundlers, evitando que el BFF y el mock intenten cargar archivos `.js` inexistentes junto a los fuentes TypeScript.
 - **2026-08-28** — Se agregó el hostname público del renderer a `preview.allowedHosts` de Vite para evitar el 403 que produce la protección de host al servir el manifiesto desde Render.
